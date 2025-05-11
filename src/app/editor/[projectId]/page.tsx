@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { transcribeAudio, TranscribeAudioInput } from "@/ai/flows/transcribe-audio-flow";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button"; // Added import
 
 // Mock functions for Firebase interactions - REPLACE WITH ACTUAL FIREBASE SDK CALLS
 const mockFirebase = {
@@ -241,3 +242,4 @@ export default function EditorPage() {
     </div>
   );
 }
+
