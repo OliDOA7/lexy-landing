@@ -1,4 +1,4 @@
-import Image from "next/image";
+
 import { CheckCircle } from "lucide-react";
 
 const targetAudiences = [
@@ -14,7 +14,7 @@ const AudienceSection = () => {
   return (
     <section className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-2 gap-12 items-center">
+        <div className="grid md:grid-cols-1 gap-12 items-center">
           <div>
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
               Built for Professionals Like You
@@ -30,15 +30,6 @@ const AudienceSection = () => {
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl">
-            <Image
-              src="https://picsum.photos/seed/audiotranscription/800/800"
-              alt="Diverse professionals using Lexy for audio transcription"
-              layout="fill"
-              objectFit="cover"
-              data-ai-hint="text transcription"
-            />
           </div>
         </div>
       </div>
