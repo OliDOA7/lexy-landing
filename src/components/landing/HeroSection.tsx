@@ -24,11 +24,11 @@ const HeroSection = () => {
         </div>
         <div className="relative aspect-video rounded-lg overflow-hidden shadow-2xl">
           <Image
-            src="https://picsum.photos/seed/lexyhero/1280/720"
-            alt="AI Transcription Dashboard"
+            src="https://picsum.photos/seed/audioplayback/1280/720"
+            alt="AI Transcription Dashboard with audio playback visualization"
             layout="fill"
             objectFit="cover"
-            data-ai-hint="technology abstract"
+            data-ai-hint="audio playback"
             className="transform hover:scale-105 transition-transform duration-500 ease-out"
           />
         </div>
@@ -38,3 +38,4 @@ const HeroSection = () => {
 };
 
 export default HeroSection;
+
