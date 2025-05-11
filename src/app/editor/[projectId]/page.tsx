@@ -10,7 +10,8 @@ import NewProjectInitialSetup from "@/components/editor/NewProjectInitialSetup";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, XSquare, Send, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button"; // Ensure Button is imported
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input"; // Added import
 
 // Replace with your actual deployed Firebase Cloud Function URL
 // For local development, this would be like: 'http://127.0.0.1:5001/lexy-s8xiw/us-central1/transcribeAudioHttp'
@@ -29,6 +30,7 @@ const mockFirebase = {
           ...projectFromGlobalStore,
           createdAt: new Date(projectFromGlobalStore.createdAt),
           expiresAt: projectFromGlobalStore.expiresAt ? new Date(projectFromGlobalStore.expiresAt) : undefined,
+          // Ensure transcript is correctly typed (string for HTML, or specific structure if parsed)
           transcript: projectFromGlobalStore.transcript, 
         };
       }
@@ -79,6 +81,17 @@ if (typeof window !== 'undefined' && !(window as any).mockProjects) {
     (window as any).mockProjects = []; 
 }
 
+const fileToDataUri = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 
 export default function EditorPage() {
   const params = useParams();
@@ -120,11 +133,13 @@ export default function EditorPage() {
           if (typeof fetchedProject.transcript === 'string') {
             setTranscriptionHtml(fetchedProject.transcript);
           } else {
+            // If transcript is an array of segments (old format or error), handle appropriately
+            // For now, setting to null if not a string (expecting HTML string)
             setTranscriptionHtml(null); 
           }
           
           const isNewProjectFlow = searchParams.get('new') === 'true';
-          if (fetchedProject.status === "Draft" && isNewProjectFlow) {
+          if (fetchedProject.status === "Draft" && isNewProjectFlow && !fetchedProject.storagePath) {
             setShowInitialNewProjectUI(true);
           } else if (fetchedProject.storagePath) {
             setShowInitialNewProjectUI(false);
@@ -133,7 +148,7 @@ export default function EditorPage() {
             setMediaPlayerSrc(playerSrc);
             setIsLoadingAudio(false);
           } else {
-             setShowInitialNewProjectUI(false); // Default to editor if not new/draft
+             setShowInitialNewProjectUI(false); // Default to editor if not new/draft without storagePath
           }
         } else {
           toast({ title: "Error", description: "Project not found or access denied.", variant: "destructive" });
@@ -156,43 +171,56 @@ export default function EditorPage() {
             const minutes = Math.floor(audio.duration / 60);
             const seconds = Math.floor(audio.duration % 60);
             setAudioDurationDisplay(`${minutes}m ${seconds}s`);
+            // Revoke object URL to free up resources after getting duration
+            URL.revokeObjectURL(audio.src);
         };
+        audio.onerror = () => {
+            setAudioDurationDisplay("Error reading duration");
+            URL.revokeObjectURL(audio.src);
+        }
     } else {
         setAudioDurationDisplay("N/A");
     }
   }, [selectedFileForUpload]);
 
 
-  const callTranscriptionService = useCallback(async (currentProject: Project) => {
-    if (!currentProject || !currentUser || !currentProject.storagePath) {
-      toast({ title: "Error", description: "Project data or audio storage path missing for transcription.", variant: "destructive" });
-      setIsTranscribing(false); // Reset transcribing state
+  const callTranscriptionService = useCallback(async (
+    projectDetails: Pick<Project, 'name' | 'language'>,
+    audioInputPath: string // Can be gs:// path or data URI
+  ) => {
+    if (!currentUser) {
+      toast({ title: "Error", description: "User data missing for transcription.", variant: "destructive" });
+      setIsTranscribing(false);
       return;
     }
   
     setIsTranscribing(true);
     setErrorState({ isError: false });
-    setTranscriptionHtml(null);
+    setTranscriptionHtml(null); // Clear previous transcription
     toast({
       title: "Transcription Initiated",
-      description: `"${currentProject.name}" is now being transcribed. This may take a few minutes.`,
+      description: `"${projectDetails.name}" is now being transcribed. This may take a few minutes.`,
     });
   
-    await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ProcessingTranscription" as ProjectStatus });
-    setProject(prev => prev ? { ...prev, status: "ProcessingTranscription" as ProjectStatus } : null);
+    // Update project status in mock DB if it's the current project
+    if (project && project.id === projectId) {
+      await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ProcessingTranscription" as ProjectStatus });
+      setProject(prev => prev ? { ...prev, status: "ProcessingTranscription" as ProjectStatus } : null);
+    }
   
     try {
+      // Check if the URL is the generic placeholder.
       if (TRANSCRIPTION_FUNCTION_URL.includes("YOUR_CLOUD_FUNCTION_URL_HERE")) {
-        console.error("Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env file.");
-        throw new Error("Transcription service URL is not configured.");
+        console.error("Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env file or .env.local file.");
+        throw new Error("Transcription service URL is not configured. Check environment variables.");
       }
   
       const response = await fetch(TRANSCRIPTION_FUNCTION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          audioStoragePath: currentProject.storagePath,
-          languageHint: currentProject.language === "auto" ? undefined : currentProject.language,
+          audioStoragePath: audioInputPath, // Use the provided audioInputPath
+          languageHint: projectDetails.language === "auto" ? undefined : projectDetails.language,
         }),
       });
   
@@ -210,10 +238,13 @@ export default function EditorPage() {
       
       const resultHtml = await response.text();
       setTranscriptionHtml(resultHtml);
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(true); // Mark changes to be saved
       
-      await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: resultHtml, status: "Completed" as ProjectStatus });
-      setProject(prev => prev ? { ...prev, transcript: resultHtml, status: "Completed" as ProjectStatus } : null);
+      // Update project with transcript and status in mock DB if it's the current project
+      if (project && project.id === projectId) {
+        await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: resultHtml, status: "Completed" as ProjectStatus });
+        setProject(prev => prev ? { ...prev, transcript: resultHtml, status: "Completed" as ProjectStatus } : null);
+      }
       
       toast({ title: "Transcription Complete", description: "Review and save your transcript." });
   
@@ -223,15 +254,19 @@ export default function EditorPage() {
       toast({ title: "Transcription Failed", description: errorMessage, variant: "destructive" });
       setErrorState({ isError: true, message: `Transcription Failed: ${errorMessage}` });
       
-      await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ErrorTranscription" as ProjectStatus });
-      setProject(prev => prev ? { ...prev, status: "ErrorTranscription" as ProjectStatus } : null);
+      // Update project status to error in mock DB if it's the current project
+      if (project && project.id === projectId) {
+        await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ErrorTranscription" as ProjectStatus });
+        setProject(prev => prev ? { ...prev, status: "ErrorTranscription" as ProjectStatus } : null);
+      }
     } finally {
       setIsTranscribing(false);
+      // If it was a new project flow, remove the query param
       if (searchParams.get('new') === 'true') {
-        router.replace(`/editor/${projectId}`, { shallow: true }); // Remove ?new=true
+        router.replace(`/editor/${projectId}`, { shallow: true }); 
       }
     }
-  }, [projectId, currentUser, toast, router, searchParams]);
+  }, [projectId, currentUser, toast, router, searchParams, project]); // Added project to dependencies
   
 
   const handleInitialTranscribe = async () => {
@@ -240,48 +275,80 @@ export default function EditorPage() {
         return;
     }
 
-    setIsTranscribing(true); // Indicate processing starts
+    setIsTranscribing(true); // Indicate processing starts for UI responsiveness
 
-    // 1. Update project name if changed
+    // 1. Update project name if changed (already done via state binding, will be saved with other updates)
     if (editableProjectName !== project.name) {
         await mockFirebase.updateProject(projectId, currentUser.uid, { name: editableProjectName });
         setProject(prev => prev ? { ...prev, name: editableProjectName } : null);
     }
 
-    // 2. "Upload" file (mock) and update project details
-    const storagePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${currentUser.uid}/${projectId}/${selectedFileForUpload.name}`;
-    const audio = document.createElement('audio');
-    audio.src = URL.createObjectURL(selectedFileForUpload);
+    // 2. Prepare audio data (convert to data URI for transcription)
+    let audioDataUri;
+    try {
+      audioDataUri = await fileToDataUri(selectedFileForUpload);
+    } catch (error) {
+      console.error("Error converting file to Data URI:", error);
+      toast({ title: "File Error", description: "Could not read the selected audio file.", variant: "destructive" });
+      setIsTranscribing(false);
+      return;
+    }
     
-    // Get duration after metadata loaded
-    const getDuration = new Promise<number>((resolve) => {
-        audio.onloadedmetadata = () => resolve(audio.duration);
+    // Mock "Upload" file and update project details in the mock database
+    // The actual storagePath for the database record remains a gs:// path.
+    const gsStoragePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${currentUser.uid}/${projectId}/${selectedFileForUpload.name}`;
+    
+    const audio = document.createElement('audio');
+    audio.src = URL.createObjectURL(selectedFileForUpload); // Use object URL for duration calculation
+    
+    const getDuration = new Promise<number>((resolve, reject) => {
+        audio.onloadedmetadata = () => {
+            URL.revokeObjectURL(audio.src); // Clean up object URL
+            resolve(audio.duration);
+        };
+        audio.onerror = () => {
+            URL.revokeObjectURL(audio.src); // Clean up object URL
+            reject(new Error("Failed to load audio metadata for duration."));
+        };
     });
-    const durationSeconds = await getDuration;
+
+    let durationSeconds;
+    try {
+        durationSeconds = await getDuration;
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Audio Error", description: "Could not determine audio duration.", variant: "destructive" });
+        setIsTranscribing(false);
+        return;
+    }
     const durationMinutes = Math.ceil(durationSeconds / 60);
 
-
     const projectUpdates: Partial<Project> = {
-        storagePath,
+        storagePath: gsStoragePath, // Store gs:// path in the mock DB
         fileType: selectedFileForUpload.type,
         fileSize: selectedFileForUpload.size,
         duration: durationMinutes,
-        status: "Uploaded" as ProjectStatus,
+        status: "Uploaded" as ProjectStatus, // Status before transcription call
+        name: editableProjectName, // ensure name is updated
     };
     await mockFirebase.updateProject(projectId, currentUser.uid, projectUpdates);
-    const updatedProject = { ...project, ...projectUpdates };
-    setProject(updatedProject);
+    const updatedProjectForDb = { ...project, ...projectUpdates };
+    setProject(updatedProjectForDb); // Reflect updates in local state
     
-    // Update player source
-    const { playerSrc } = await mockFirebase.getAudioUrl(storagePath);
+    // Update player source with a mock HTTPS URL for the player component
+    const { playerSrc } = await mockFirebase.getAudioUrl(gsStoragePath);
     setMediaPlayerSrc(playerSrc);
 
-    // 3. Call transcription service
-    await callTranscriptionService(updatedProject);
+    // 3. Call transcription service using the data URI
+    // Pass only necessary details for transcription to callTranscriptionService
+    await callTranscriptionService(
+      { name: updatedProjectForDb.name, language: updatedProjectForDb.language },
+      audioDataUri // Pass data URI for transcription
+    );
 
     // 4. Switch UI
     setShowInitialNewProjectUI(false);
-    // setIsTranscribing is handled by callTranscriptionService
+    // isTranscribing state is managed within callTranscriptionService
   };
 
 
@@ -319,6 +386,7 @@ export default function EditorPage() {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
+      // Consider using a more user-friendly confirmation dialog (e.g., ShadCN AlertDialog)
       if (confirm("You have unsaved changes. Are you sure you want to close?")) {
         router.push("/dashboard");
       }
@@ -327,6 +395,7 @@ export default function EditorPage() {
     }
   };
 
+  // Initial loading state for the entire page
   if (isLoadingProject) {
     return (
       <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[calc(100vh-10rem)]">
@@ -336,6 +405,7 @@ export default function EditorPage() {
     );
   }
   
+  // New project setup UI
   if (showInitialNewProjectUI && project) {
     return (
         <NewProjectInitialSetup
@@ -343,7 +413,7 @@ export default function EditorPage() {
             selectedFile={selectedFileForUpload}
             onFileSelect={setSelectedFileForUpload}
             onTranscribe={handleInitialTranscribe}
-            isProcessing={isTranscribing || isSaving}
+            isProcessing={isTranscribing} // Only pass isTranscribing for this initial step
             editableProjectName={editableProjectName}
             onProjectNameChange={setEditableProjectName}
             audioDurationDisplay={audioDurationDisplay}
@@ -351,7 +421,7 @@ export default function EditorPage() {
     );
   }
 
-
+  // If project fetch failed or no project found
   if (!project) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
@@ -363,13 +433,13 @@ export default function EditorPage() {
     );
   }
   
-  // Conditions for showing the manual "Transcribe" button in the main editor view
+  // Main editor view
   const showManualTranscribeButton = project && 
-    (project.status === "Uploaded" || project.status === "ErrorTranscription") && 
+    (project.status === "Uploaded" || project.status === "ErrorTranscription" || project.status === "Draft") && // Allow re-transcribe from Draft if audio exists
     project.storagePath && !isTranscribing && !showInitialNewProjectUI;
 
   const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || !transcriptionHtml || 
-    (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription");
+    (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription" && project.status !== "Uploaded");
 
 
   return (
@@ -384,11 +454,11 @@ export default function EditorPage() {
                     setEditableProjectName(e.target.value);
                     if (project && e.target.value !== project.name) setHasUnsavedChanges(true);
                   }}
-                  className="text-2xl md:text-3xl font-semibold p-1 border-0 focus-visible:ring-1 focus-visible:ring-primary mb-1"
+                  className="text-2xl md:text-3xl font-semibold p-1 border-0 focus-visible:ring-1 focus-visible:ring-primary mb-1 bg-transparent"
                   disabled={isTranscribing || isSaving}
                 />
               <CardDescription>
-                Language: {project.language} | Duration: {project.duration > 0 ? `${project.duration} min` : 'N/A'} | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : project.status === 'ProcessingTranscription' ? 'text-blue-500 animate-pulse' : 'text-blue-500'}`}>{project.status}</span>
+                Language: {project.language} | Duration: {project.duration > 0 ? `${project.duration} min` : audioDurationDisplay !== 'N/A' ? audioDurationDisplay : 'N/A'} | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : project.status === 'ProcessingTranscription' ? 'text-blue-500 animate-pulse' : 'text-blue-500'}`}>{project.status}</span>
                 {project.expiresAt && <p className="text-xs text-muted-foreground mt-1">Audio file expires: {new Date(project.expiresAt).toLocaleDateString()}</p>}
               </CardDescription>
             </div>
@@ -398,7 +468,16 @@ export default function EditorPage() {
                 Close
               </Button>
               {showManualTranscribeButton && (
-                <Button onClick={() => callTranscriptionService(project)} disabled={isTranscribing || isSaving || isLoadingAudio}>
+                <Button onClick={() => {
+                  if (project.storagePath) { // Ensure storagePath exists for re-transcription
+                     callTranscriptionService(
+                        { name: editableProjectName, language: project.language },
+                        project.storagePath // Use GCS path for re-transcribe
+                     );
+                  } else {
+                    toast({ title: "Error", description: "Audio file not found for re-transcription.", variant: "destructive"});
+                  }
+                }} disabled={isTranscribing || isSaving || isLoadingAudio}>
                   <Send className="mr-2 h-4 w-4" />
                   Transcribe
                 </Button>
