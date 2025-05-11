@@ -33,11 +33,11 @@ const AudienceSection = () => {
           </div>
           <div className="relative aspect-square rounded-lg overflow-hidden shadow-xl">
             <Image
-              src="https://picsum.photos/seed/transcriptionaudio/800/800"
-              alt="Diverse professionals using Lexy for transcription"
+              src="https://picsum.photos/seed/audiotranscription/800/800"
+              alt="Diverse professionals using Lexy for audio transcription"
               layout="fill"
               objectFit="cover"
-              data-ai-hint="transcription audio"
+              data-ai-hint="audio transcription"
             />
           </div>
         </div>
@@ -47,4 +47,3 @@ const AudienceSection = () => {
 };
 
 export default AudienceSection;
-
