@@ -119,13 +119,20 @@ export default function DashboardPage() {
 
     // Simulate adding to Firestore and update local state
     setProjects(prevProjects => [newProject, ...prevProjects]);
+    
+    // Add to global mock projects for editor page to find if it's used there
+    if (typeof window !== 'undefined' && (window as any).mockProjects) {
+        (window as any).mockProjects.push(newProject);
+    }
+
+
     setIsLoading(false);
     
     toast({
       title: "Project Created",
-      description: `"${newProject.name}" created. Redirecting to editor...`,
+      description: `"${newProject.name}" created. Redirecting to editor for transcription...`,
     });
-    router.push(`/editor/${newProjectId}`);
+    router.push(`/editor/${newProjectId}?new=true`); // Add ?new=true
     return newProjectId;
   };
 
@@ -134,6 +141,10 @@ export default function DashboardPage() {
     // Simulate project deletion from Firestore and Storage
     await new Promise(resolve => setTimeout(resolve, 500));
     setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+    // Also remove from mockProjects if it exists
+     if (typeof window !== 'undefined' && (window as any).mockProjects) {
+        (window as any).mockProjects = (window as any).mockProjects.filter((p: Project) => p.id !== projectId);
+    }
     toast({ title: "Project Deleted", description: "The project has been removed." });
     setIsDeletingProject(false);
   };
@@ -155,7 +166,7 @@ export default function DashboardPage() {
         projects={projects}
         isLoading={isLoading || isDeletingProject}
         currentPlanConfig={currentPlanConfig}
-        onAddProject={handleAddProject} // Updated to return ID for navigation
+        onAddProject={handleAddProject} 
         onDeleteProject={handleDeleteProject}
         onEditProject={handleEditProject}
       />

@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Project, TranscriptionSegment, UserProfile, ProjectStatus } from "@/lib/types";
 import MediaPlayer from "@/components/editor/MediaPlayer";
 import TranscriptionTable from "@/components/editor/TranscriptionTable";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { transcribeAudio, TranscribeAudioInput } from "@/ai/flows/transcribe-audio-flow";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button"; // Added import
+import { Button } from "@/components/ui/button";
 
 // Mock functions for Firebase interactions - REPLACE WITH ACTUAL FIREBASE SDK CALLS
 const mockFirebase = {
@@ -32,6 +32,13 @@ const mockFirebase = {
         const projectIndex = (window as any).mockProjects.findIndex((p: Project) => p.id === projectId && p.ownerId === userId);
         if (projectIndex !== -1) {
             (window as any).mockProjects[projectIndex] = { ...(window as any).mockProjects[projectIndex], ...updates };
+            // Ensure dates are correctly handled if they are stringified
+            if (updates.createdAt && typeof updates.createdAt === 'string') {
+              (window as any).mockProjects[projectIndex].createdAt = new Date(updates.createdAt);
+            }
+            if (updates.expiresAt && typeof updates.expiresAt === 'string') {
+              (window as any).mockProjects[projectIndex].expiresAt = new Date(updates.expiresAt);
+            }
             return true;
         }
     }
@@ -42,22 +49,24 @@ const mockFirebase = {
     if (!storagePath) return undefined;
     console.log(`Mock Firebase: Getting audio URL for ${storagePath}`);
     await new Promise(resolve => setTimeout(resolve, 300));
-    // In a real app, this would return a gs:// or https:// URL.
-    // For mock, let's assume a placeholder or a relative path if you have local mock audio.
     // Using picsum as placeholder for now. Replace with actual audio.
-    if (storagePath.includes("mock-alpha.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; // Placeholder audio
+    if (storagePath.includes("mock-alpha.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; 
     if (storagePath.includes("mock-beta.wav")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
     if (storagePath.includes("mock-gamma.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
-    return `https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3`; // Default placeholder
+    // Fallback for dynamically created project paths
+    return `https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3`; 
   },
   // Mock current user (replace with actual Firebase Auth)
   getCurrentUser: async (): Promise<UserProfile | null> => {
     return { uid: "user123abc", name: "Demo User", email: "demo@example.com", planId: "starter" };
   }
 };
+
 // Initialize mock projects globally for persistence across mock calls (for demo only)
 if (typeof window !== 'undefined' && !(window as any).mockProjects) {
-    (window as any).mockProjects = [ // Simplified initial mock project for editor
+    (window as any).mockProjects = [ 
+        { id: "proj1", ownerId: "user123abc", name: "Client Interview - Alpha Project", duration: 15, language: "en-US", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), status: "Completed", storagePath: "audio/user123abc/proj1/mock-alpha.mp3", transcript: [{timestamp: "00:00:10", speaker: "Speaker A", text: "This is a transcript for the Alpha project..."}], fileType: "audio/mpeg", fileSize: 15728640, expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: "proj2", ownerId: "user123abc", name: "Internal Brainstorming Session - Project Beta", duration: 45, language: "es-ES", createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), status: "ProcessingTranscription", storagePath: "audio/user123abc/proj2/mock-beta.wav", fileType: "audio/wav", fileSize: 47185920, expiresAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString() },
         { id: "proj3", ownerId: "user123abc", name: "Lecture Recording - Gamma Initiative", duration: 5, language: "fr-FR", createdAt: new Date().toISOString(), status: "Uploaded", storagePath: "audio/user123abc/proj3/mock-gamma.mp3", fileType: "audio/mpeg", fileSize: 5242880, transcript: [], expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() },
     ];
 }
@@ -67,6 +76,7 @@ export default function EditorPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [project, setProject] = useState<Project | null>(null);
@@ -82,6 +92,7 @@ export default function EditorPage() {
   const [errorState, setErrorState] = useState<{isError: boolean, message?: string}>({isError: false});
 
 
+  // Initial data fetching
   useEffect(() => {
     async function fetchData() {
       setIsLoadingProject(true);
@@ -103,7 +114,6 @@ export default function EditorPage() {
         } else {
           toast({ title: "Error", description: "Project not found or access denied.", variant: "destructive" });
           setErrorState({isError: true, message: "Project not found or access denied."});
-          // router.push("/dashboard"); // Optionally redirect
         }
       }
       setIsLoadingProject(false);
@@ -111,38 +121,45 @@ export default function EditorPage() {
     if (projectId) {
       fetchData();
     }
-  }, [projectId, router, toast]);
+  }, [projectId, toast]);
 
-  const handleTranscribe = async () => {
+  const memoizedHandleTranscribe = useCallback(async () => {
     if (!project || !project.storagePath || !currentUser) {
-      toast({ title: "Error", description: "Project data or audio path missing.", variant: "destructive" });
+      toast({ title: "Error", description: "Project data or audio path missing for transcription.", variant: "destructive" });
       return;
     }
+    
     if (project.status === "Completed" || project.status === "ProcessingTranscription") {
-        toast({ title: "Info", description: "Transcription already processed or in progress.", variant: "default" });
+        console.log("Auto-transcribe skipped: Project already processed or in progress.");
+        // Optionally, clear the 'new' query param if it somehow persisted and this state is reached.
+        if (searchParams.get('new') === 'true') {
+            router.replace(`/editor/${projectId}`, { shallow: true });
+        }
         return;
     }
 
     setIsTranscribing(true);
     setErrorState({isError: false});
+    toast({
+        title: "Transcription Initiated",
+        description: `"${project.name}" is now being transcribed.`,
+    });
+
     await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ProcessingTranscription" as ProjectStatus });
     setProject(prev => prev ? {...prev, status: "ProcessingTranscription" as ProjectStatus} : null);
 
     try {
-      // Ensure audioStoragePath is a URL Genkit can handle (HTTPS or data URI)
-      // For mock, getAudioUrl provides a usable HTTPS URL
       const audioUrlForGenkit = await mockFirebase.getAudioUrl(project.storagePath);
       if (!audioUrlForGenkit) {
         throw new Error("Could not obtain a valid audio URL for transcription.");
       }
-
       const input: TranscribeAudioInput = {
         audioStoragePath: audioUrlForGenkit,
         languageHint: project.language === "auto" ? undefined : project.language,
       };
       const result = await transcribeAudio(input);
       setTranscription(result);
-      setHasUnsavedChanges(true); // New transcript needs saving
+      setHasUnsavedChanges(true);
       await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: result, status: "Completed" as ProjectStatus });
       setProject(prev => prev ? {...prev, transcript: result, status: "Completed" as ProjectStatus} : null);
       toast({ title: "Transcription Complete", description: "Review and save your transcript." });
@@ -155,19 +172,37 @@ export default function EditorPage() {
     } finally {
       setIsTranscribing(false);
     }
-  };
+  }, [project, currentUser, projectId, toast, setProject, setTranscription, setIsTranscribing, setErrorState, setHasUnsavedChanges, router, searchParams]);
+
+
+  // Auto-transcription for new projects
+  useEffect(() => {
+    const isNewProject = searchParams.get('new') === 'true';
+
+    if (
+      isNewProject &&
+      project && 
+      project.status === "Uploaded" && 
+      currentUser && 
+      !isLoadingProject && 
+      !isTranscribing 
+    ) {
+      memoizedHandleTranscribe();
+      router.replace(`/editor/${projectId}`, { shallow: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, currentUser, isLoadingProject, isTranscribing, searchParams, projectId, router, memoizedHandleTranscribe]);
+
 
   const handleSave = async () => {
     if (!project || !currentUser) return;
     setIsSaving(true);
     setErrorState({isError: false});
     try {
-      // Here, you might allow editing of transcription segments, then save them.
-      // For now, we just save the existing `transcription` state.
       const success = await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: transcription, status: "Completed" as ProjectStatus });
       if (success) {
         setHasUnsavedChanges(false);
-        setProject(prev => prev ? {...prev, status: "Completed" as ProjectStatus} : null); // Reflect status change
+        setProject(prev => prev ? {...prev, status: "Completed" as ProjectStatus} : null); 
         toast({ title: "Project Saved", description: "Your transcript has been saved." });
       } else {
         throw new Error("Failed to save project to database.");
@@ -210,8 +245,7 @@ export default function EditorPage() {
     );
   }
 
-  const canTranscribe = project.status === "Uploaded" || project.status === "Draft" || project.status === "ErrorTranscription";
-
+  const canManuallyTranscribe = project.status === "Uploaded" || project.status === "Draft" || project.status === "ErrorTranscription";
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-6 md:py-8">
@@ -225,15 +259,15 @@ export default function EditorPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <MediaPlayer audioSrc={audioSrc} isLoading={isLoadingAudio} />
-          <TranscriptionTable segments={transcription} isLoading={isTranscribing} />
+          <TranscriptionTable segments={transcription} isLoading={isTranscribing && transcription.length === 0} />
         </CardContent>
          <EditorControls
-            onTranscribe={handleTranscribe}
+            onTranscribe={memoizedHandleTranscribe} // Use the memoized version for manual click too
             onSave={handleSave}
             onClose={handleClose}
             isTranscribing={isTranscribing}
             isSaving={isSaving}
-            canTranscribe={!!project.storagePath && canTranscribe && !isTranscribing}
+            canTranscribe={!!project.storagePath && canManuallyTranscribe && !isTranscribing}
             hasChanges={hasUnsavedChanges}
             isError={errorState.isError}
             errorMessage={errorState.message}
@@ -242,4 +276,3 @@ export default function EditorPage() {
     </div>
   );
 }
-
