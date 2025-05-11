@@ -65,6 +65,19 @@ export default function SignUpPage() {
     setIsModalOpen(true);
   };
 
+  const proceedToPlanSelection = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isLoggedInMock', 'true');
+      // Dispatch a custom event to notify the header or other components if needed immediately
+      window.dispatchEvent(new StorageEvent('storage', { key: 'isLoggedInMock', newValue: 'true' }));
+    }
+    toast({
+      title: "Account Created!",
+      description: "You've successfully signed up. Redirecting to plan selection...",
+    });
+    router.push("/plans"); // Redirect to plan selection
+  }
+
   const handleAcknowledgeCompliance = async () => {
     setIsModalOpen(false);
     if (!formData) return;
@@ -73,14 +86,9 @@ export default function SignUpPage() {
     // Simulate API call for user registration
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsLoading(false);
-
-    // Mock success
+    
     console.log("Simulated signup with:", formData.email);
-    toast({
-      title: "Account Created!",
-      description: "You've successfully signed up. Redirecting to plan selection...",
-    });
-    router.push("/plans"); // Redirect to plan selection
+    proceedToPlanSelection();
   };
 
   const handleGoogleSignUp = async () => {
@@ -88,15 +96,24 @@ export default function SignUpPage() {
     // Simulate Google Sign Up
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsLoading(false);
-    toast({
-      title: "Google Sign-Up Initiated",
-      description: "Please follow Google's instructions.",
-    });
+    
     // For this mock, we'll assume Google sign-up also requires compliance then redirects.
     setFormData({ email: "user@google.com", password: "googlepassword", confirmPassword: "googlepassword"}); // Mock data
+    
     // After Google auth callback, you would typically show the compliance modal if needed,
     // then redirect. Here we simplify:
-    setIsModalOpen(true); 
+    // If Google signup directly implies compliance for this mock, or if modal is handled by Google flow:
+    // setIsModalOpen(true); // Or skip if Google handles its own flow and compliance elsewhere
+    // For this example, let's say Google signup also means compliance is acknowledged or handled by Google.
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isLoggedInMock', 'true');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'isLoggedInMock', newValue: 'true' }));
+    }
+    toast({
+      title: "Google Sign-Up Successful",
+      description: "Redirecting to plan selection...",
+    });
+    router.push("/plans"); // Redirect to plan selection
   };
 
   return (
@@ -189,3 +206,4 @@ export default function SignUpPage() {
     </div>
   );
 }
+

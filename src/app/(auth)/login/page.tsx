@@ -58,6 +58,11 @@ export default function LoginPage() {
     setIsLoading(false);
 
     // Mock success
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isLoggedInMock', 'true');
+      // Dispatch a custom event to notify the header or other components if needed immediately
+      window.dispatchEvent(new StorageEvent('storage', { key: 'isLoggedInMock', newValue: 'true' }));
+    }
     console.log("Simulated login with:", values.email);
     toast({
       title: "Login Successful!",
@@ -71,6 +76,10 @@ export default function LoginPage() {
     // Simulate Google Login
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsLoading(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('isLoggedInMock', 'true');
+      window.dispatchEvent(new StorageEvent('storage', { key: 'isLoggedInMock', newValue: 'true' }));
+    }
     toast({
       title: "Google Login Successful",
       description: "Redirecting to your dashboard...",
@@ -151,3 +160,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
