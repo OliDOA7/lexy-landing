@@ -24,9 +24,9 @@ interface ProjectsListProps {
   projects: Project[];
   isLoading: boolean;
   currentPlanConfig: PlanConfig | null;
-  onAddProject: (projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "fileURL" | "transcript"> & { audioFile: File }) => Promise<void>;
+  onAddProject: (projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "storagePath" | "transcript" | "expiresAt"> & { audioFile: File }) => Promise<string | null>;
   onDeleteProject: (projectId: string) => Promise<void>;
-  onEditProject: (project: Project) => void; // Placeholder for edit functionality
+  onEditProject: (project: Project) => void;
 }
 
 const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProject, onDeleteProject, onEditProject }: ProjectsListProps) => {
@@ -36,7 +36,7 @@ const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProje
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
-  const handleCreateNewProject = () => {
+  const handleCreateNewProjectClick = () => {
     if (!user || !currentPlanConfig) {
          toast({ title: "Error", description: "Cannot create project. User or plan data missing.", variant: "destructive" });
         return;
@@ -53,8 +53,9 @@ const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProje
     setIsDeleting(true);
     try {
       await onDeleteProject(projectToDelete);
-      toast({ title: "Project Deleted", description: "The project has been successfully deleted." });
+      // Toast handled by DashboardPage
     } catch (error) {
+      // Toast handled by DashboardPage if it throws, or generic here
       toast({ title: "Deletion Failed", description: "Could not delete project. Please try again.", variant: "destructive" });
       console.error("Deletion error:", error);
     } finally {
@@ -67,17 +68,12 @@ const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProje
     setProjectToDelete(projectId);
   };
   
-  // Placeholder for edit functionality
-  const handleEdit = (projectId: string) => {
-    const projectToEdit = projects.find(p => p.id === projectId);
-    if (projectToEdit) {
-      onEditProject(projectToEdit); // This would typically open an editor view/modal
-      toast({ title: "Edit Project", description: `Editing "${projectToEdit.name}". (Functionality WIP)`});
-    }
+  const handleEdit = (project: Project) => {
+    onEditProject(project); // This will navigate to the editor page
   };
 
 
-  if (isLoading) {
+  if (isLoading && projects.length === 0) { // Show loader only if projects are truly loading initially
     return (
       <div className="flex justify-center items-center py-10">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -97,26 +93,33 @@ const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProje
           <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" onClick={() => setViewMode('list')} aria-label="List view">
             <List className="h-5 w-5" />
           </Button>
-          <Button onClick={handleCreateNewProject} className="ml-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={handleCreateNewProjectClick} className="ml-2 bg-primary hover:bg-primary/90 text-primary-foreground">
             <FilePlus className="h-5 w-5 mr-2" />
             Create New Project
           </Button>
         </div>
       </div>
 
-      {projects.length === 0 ? (
+      {isLoading && projects.length > 0 && ( // Inline loader when projects exist but are updating
+        <div className="flex justify-center items-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="ml-2 text-sm text-muted-foreground">Updating projects...</p>
+        </div>
+      )}
+
+      {!isLoading && projects.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed border-border rounded-lg bg-card">
           <FilePlus className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold mb-2">No projects yet.</h3>
           <p className="text-muted-foreground mb-6">Start by creating your first transcription project.</p>
-          <Button onClick={handleCreateNewProject} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={handleCreateNewProjectClick} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
             Create Your First Project
           </Button>
         </div>
       ) : (
         <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" : "space-y-3"}>
           {projects.map((project) => (
-            <ProjectItem key={project.id} project={project} viewMode={viewMode} onEdit={() => handleEdit(project.id)} onDelete={() => openDeleteDialog(project.id)} />
+            <ProjectItem key={project.id} project={project} viewMode={viewMode} onEdit={() => handleEdit(project)} onDelete={() => openDeleteDialog(project.id)} />
           ))}
         </div>
       )}
@@ -124,7 +127,7 @@ const ProjectsList = ({ user, projects, isLoading, currentPlanConfig, onAddProje
       <CreateProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onCreateProject={onAddProject}
+        onAddProject={onAddProject} // This prop is now correctly typed
         user={user}
         currentPlanConfig={currentPlanConfig}
         projects={projects}

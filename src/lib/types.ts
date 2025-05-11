@@ -24,18 +24,36 @@ export interface UserProfile {
   // minutesUsed and minutesRemaining will be computed or derived
 }
 
+export interface TranscriptionSegment {
+  timestamp: string; // Format: HH:MM:SS or MM:SS
+  speaker: string;
+  text: string;
+}
+
+export type ProjectStatus = 
+  | "Draft" // Initial state, file not yet uploaded or processing not started
+  | "Uploaded" // File uploaded to storage, awaiting transcription trigger
+  | "PendingTranscription" // User triggered transcription, waiting for function pickup
+  | "ProcessingTranscription" // Cloud function is actively processing
+  | "Completed" // Transcription successful, data available
+  | "Error" // General error
+  | "ErrorTranscription" // Specific error during transcription process
+  | "Processing"; // Legacy or general processing state, to be refined
+
 export interface Project {
   id: string;
   ownerId: string;
   name: string;
-  duration: number; // in minutes
-  language: string;
-  createdAt: Date; // Using Date object for easier manipulation, can be Timestamp from Firestore
-  status: "Draft" | "Completed" | "Processing" | "Error";
-  fileURL?: string; // URL to audio file in storage
-  transcript?: string; // text content
-  fileType?: string; // e.g., 'audio/mp3', 'audio/wav'
+  duration: number; // in minutes, can be an estimate initially
+  language: string; // User-selected or auto-detected language code
+  createdAt: Date; // Using Date object for easier manipulation
+  status: ProjectStatus;
+  storagePath?: string; // Path to audio file in Firebase Storage, e.g., "audio/{userId}/{projectId}/filename.mp3"
+  fileURL?: string; // Publicly accessible URL if generated, otherwise use storagePath to fetch
+  transcript?: TranscriptionSegment[]; // Array of transcription segments
+  fileType?: string; // e.g., 'audio/mpeg', 'audio/wav'
   fileSize?: number; // in bytes
+  expiresAt?: Date; // Date when the project (especially audio file) expires
 }
 
 // Used for plan configuration, separate from display `Plan` type

@@ -4,17 +4,18 @@
 import { useEffect, useState }from "react";
 import UsageSummary from "@/components/dashboard/UsageSummary";
 import ProjectsList from "@/components/dashboard/ProjectsList";
-import type { UserProfile, Project, PlanConfig } from "@/lib/types";
-import { PLANS_CONFIG } from "@/lib/config"; // Assuming plan configurations are here
+import type { UserProfile, Project, PlanConfig, ProjectStatus } from "@/lib/types";
+import { PLANS_CONFIG } from "@/lib/config"; 
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { addDays } from "date-fns";
 
 // Mock user data - replace with actual auth logic
 const mockUser: UserProfile = {
   uid: "user123abc",
   name: "Demo User",
   email: "demo@example.com",
-  planId: "starter", // Default plan for mock
+  planId: "starter", 
 };
 
 // Mock projects data - replace with Firestore fetching
@@ -23,37 +24,41 @@ const mockProjectsInitial: Project[] = [
     id: "proj1",
     ownerId: "user123abc",
     name: "Client Interview - Alpha Project",
-    duration: 15, // minutes
-    language: "English (US)",
-    createdAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
+    duration: 15, 
+    language: "en-US",
+    createdAt: new Date(Date.now() - 86400000 * 2), 
     status: "Completed",
-    fileURL: "/audio/mock-alpha.mp3",
-    transcript: "This is a transcript for the Alpha project...",
+    storagePath: "audio/user123abc/proj1/mock-alpha.mp3",
+    transcript: [{timestamp: "00:00:10", speaker: "Speaker A", text: "This is a transcript for the Alpha project..."}],
     fileType: "audio/mpeg",
-    fileSize: 15 * 1024 * 1024, // 15MB
+    fileSize: 15 * 1024 * 1024, 
+    expiresAt: addDays(new Date(Date.now() - 86400000 * 2), PLANS_CONFIG.starter.storageDays || 0),
   },
   {
     id: "proj2",
     ownerId: "user123abc",
     name: "Internal Brainstorming Session - Project Beta",
     duration: 45,
-    language: "Spanish (Spain)",
-    createdAt: new Date(Date.now() - 86400000 * 1), // 1 day ago
-    status: "Processing",
-    fileURL: "/audio/mock-beta.wav",
+    language: "es-ES",
+    createdAt: new Date(Date.now() - 86400000 * 1), 
+    status: "ProcessingTranscription",
+    storagePath: "audio/user123abc/proj2/mock-beta.wav",
     fileType: "audio/wav",
     fileSize: 45 * 1024 * 1024,
+    expiresAt: addDays(new Date(Date.now() - 86400000 * 1), PLANS_CONFIG.starter.storageDays || 0),
   },
   {
     id: "proj3",
     ownerId: "user123abc",
     name: "Lecture Recording - Gamma Initiative",
     duration: 5,
-    language: "French (France)",
+    language: "fr-FR",
     createdAt: new Date(),
-    status: "Draft",
+    status: "Uploaded", // Changed status to Uploaded for editor flow
+    storagePath: "audio/user123abc/proj3/mock-gamma.mp3",
     fileType: "audio/mpeg",
     fileSize: 5 * 1024 * 1024,
+    expiresAt: addDays(new Date(), PLANS_CONFIG.starter.storageDays || 0),
   },
 ];
 
@@ -67,18 +72,14 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Simulate fetching user and project data
     const fetchData = async () => {
       setIsLoading(true);
-      // In a real app, fetch user from Firebase Auth, then user's plan from Firestore
-      // For now, use mockUser and derive plan config
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
       
       setUser(mockUser);
       const planConfig = PLANS_CONFIG[mockUser.planId] || PLANS_CONFIG.free;
       setCurrentPlanConfig(planConfig);
       
-      // Fetch projects for this user (mocked)
       setProjects(mockProjectsInitial.filter(p => p.ownerId === mockUser.uid));
       setIsLoading(false);
     };
@@ -86,42 +87,63 @@ export default function DashboardPage() {
   }, []);
 
   const handleAddProject = async (
-    projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "fileURL" | "transcript"> & { audioFile: File }
-  ) => {
-    if (!user) {
-      toast({ title: "Error", description: "User not found.", variant: "destructive" });
-      return;
+    projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "storagePath" | "transcript" | "expiresAt"> & { audioFile: File }
+  ): Promise<string | null> => { // Return new project ID or null on failure
+    if (!user || !currentPlanConfig) {
+      toast({ title: "Error", description: "User or plan data is missing.", variant: "destructive" });
+      return null;
     }
-    // Simulate project creation and adding to list
-    const newProject: Project = {
-      ...projectData,
-      id: `proj${Date.now()}`, // Generate a unique ID
-      ownerId: user.uid,
-      createdAt: new Date(),
-      status: "Processing", // Initial status
-      // fileURL and transcript would be set after processing
-    };
-    setProjects(prevProjects => [newProject, ...prevProjects]);
-    // Here you would typically upload file to storage and save metadata to Firestore
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing
+
+    setIsLoading(true);
+    const newProjectId = `proj${Date.now()}`;
+    const storagePath = `audio/${user.uid}/${newProjectId}/${projectData.audioFile.name}`;
     
-    // Simulate completion
-    setProjects(prevProjects => prevProjects.map(p => p.id === newProject.id ? {...p, status: "Completed", transcript: "Mock transcript generated."} : p));
+    // Simulate file upload to Firebase Storage
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+    console.log(`Simulated upload of ${projectData.audioFile.name} to ${storagePath}`);
+
+    const newProject: Project = {
+      id: newProjectId,
+      ownerId: user.uid,
+      name: projectData.name,
+      language: projectData.language,
+      duration: projectData.duration, // Estimated duration
+      createdAt: new Date(),
+      status: "Uploaded" as ProjectStatus,
+      storagePath: storagePath,
+      fileType: projectData.fileType,
+      fileSize: projectData.fileSize,
+      expiresAt: addDays(new Date(), currentPlanConfig.storageDays ?? 0),
+      transcript: [], // Initialize with empty transcript
+    };
+
+    // Simulate adding to Firestore and update local state
+    setProjects(prevProjects => [newProject, ...prevProjects]);
+    setIsLoading(false);
+    
+    toast({
+      title: "Project Created",
+      description: `"${newProject.name}" created. Redirecting to editor...`,
+    });
+    router.push(`/editor/${newProjectId}`);
+    return newProjectId;
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    // Simulate project deletion
+    setIsDeletingProject(true);
+    // Simulate project deletion from Firestore and Storage
+    await new Promise(resolve => setTimeout(resolve, 500));
     setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-    // Here you would delete from Firestore and storage
-     await new Promise(resolve => setTimeout(resolve, 500));
+    toast({ title: "Project Deleted", description: "The project has been removed." });
+    setIsDeletingProject(false);
   };
 
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+
+
   const handleEditProject = (project: Project) => {
-    // Navigate to an editor page or open an edit modal
-    // For now, just log it or show a toast
-    console.log("Editing project:", project);
-    // Example: router.push(`/dashboard/edit-project/${project.id}`);
-    toast({ title: "Edit Project", description: `Opening editor for ${project.name}... (Editor not implemented)`});
+    // Navigate to the editor page for this project
+    router.push(`/editor/${project.id}`);
   };
 
 
@@ -131,9 +153,9 @@ export default function DashboardPage() {
       <ProjectsList
         user={user}
         projects={projects}
-        isLoading={isLoading}
+        isLoading={isLoading || isDeletingProject}
         currentPlanConfig={currentPlanConfig}
-        onAddProject={handleAddProject}
+        onAddProject={handleAddProject} // Updated to return ID for navigation
         onDeleteProject={handleDeleteProject}
         onEditProject={handleEditProject}
       />
