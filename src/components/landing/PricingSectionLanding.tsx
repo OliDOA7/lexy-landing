@@ -1,45 +1,13 @@
 
 import type { Plan } from "@/lib/types";
+import { DISPLAY_PLANS } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check } from "lucide-react";
 import Link from "next/link";
 
-const plans: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    priceFrequency: "/month",
-    features: ["1 project", "3 mins/day transcription", "Standard Accuracy", "Local storage only"],
-    cta: "Get Started",
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: "$19.99",
-    priceFrequency: "/mo",
-    features: ["5 projects", "45 mins/day transcription", "5-day cloud storage"],
-    cta: "Choose Starter",
-  },
-  {
-    id: "plus",
-    name: "Plus",
-    price: "$69.99",
-    priceFrequency: "/mo",
-    features: ["30 projects", "1500 mins/month", "15-day cloud storage", "Speaker ID"],
-    cta: "Choose Plus",
-    isPopular: true,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$199",
-    priceFrequency: "/mo",
-    features: ["100 projects, 5 members", "5000 mins/month", "3-month cloud storage", "API Access"],
-    cta: "Choose Pro",
-  },
-];
+// Only show a subset of plans on the landing page for brevity
+const landingPagePlans: Plan[] = DISPLAY_PLANS.slice(0, 4); // Show all 4 defined for landing
 
 const PricingSectionLanding = () => {
   return (
@@ -52,7 +20,7 @@ const PricingSectionLanding = () => {
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {plans.map((plan) => (
+          {landingPagePlans.map((plan) => (
             <Card key={plan.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${plan.isPopular ? 'border-primary border-2 relative' : ''}`}>
               {plan.isPopular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-sm font-semibold rounded-full">
@@ -68,7 +36,7 @@ const PricingSectionLanding = () => {
               </CardHeader>
               <CardContent className="flex-grow">
                 <ul className="space-y-2">
-                  {plan.features.map((feature, index) => (
+                  {plan.features.slice(0,4).map((feature, index) => ( // Show first 4 features for brevity on landing
                     <li key={index} className="flex items-center">
                       <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
                       <span>{feature}</span>
@@ -78,7 +46,7 @@ const PricingSectionLanding = () => {
               </CardContent>
               <CardFooter>
                 <Button className="w-full" variant={plan.isPopular ? "default" : "outline"} asChild>
-                  <Link href="/plans">{plan.cta}</Link>
+                  <Link href="/signup">{plan.cta === "Get Started" ? plan.cta : "Choose Plan"}</Link>
                 </Button>
               </CardFooter>
             </Card>

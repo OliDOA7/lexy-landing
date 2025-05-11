@@ -1,28 +1,20 @@
+
 "use client";
 
 import type { Plan } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
 
 interface PlanCardProps {
   plan: Plan;
+  onSelectPlan: (planName: string) => void;
 }
 
-const PlanCard = ({ plan }: PlanCardProps) => {
-  const router = useRouter();
-  const { toast } = useToast();
+const PlanCard = ({ plan, onSelectPlan }: PlanCardProps) => {
 
-  const handleSelectPlan = async () => {
-    // Simulate API call to save plan choice
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({
-      title: `Plan Selected: ${plan.name}`,
-      description: "Your plan has been updated. Redirecting...",
-    });
-    router.push("/"); // Redirect to dashboard or home
+  const handleSelect = () => {
+    onSelectPlan(plan.name);
   };
 
   return (
@@ -66,7 +58,7 @@ const PlanCard = ({ plan }: PlanCardProps) => {
         <Button 
           className="w-full" 
           variant={plan.isPopular || plan.themeColor ? "default" : "outline"} 
-          onClick={handleSelectPlan}
+          onClick={handleSelect}
           style={plan.themeColor && !plan.isPopular ? {backgroundColor: plan.themeColor, color: 'hsl(var(--primary-foreground))'} : {}}
         >
           {plan.cta}

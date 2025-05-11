@@ -3,91 +3,33 @@
 
 import PlanCard from "@/components/plans/PlanCard";
 import type { Plan } from "@/lib/types";
+import { DISPLAY_PLANS } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
-const plansData: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    priceFrequency: "/month",
-    features: [
-      "1 project",
-      "3 minutes of transcription per day",
-      "Standard Accuracy",
-      "Unable to save project in cloud",
-      "Community support",
-    ],
-    cta: "Start with Free",
-    themeColor: "hsl(var(--muted-foreground))"
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: "$19.99",
-    priceFrequency: "/mo",
-    features: [
-      "Up to 5 projects",
-      "45 minutes of transcription per day",
-      "Projects saved for up to 5 days from creation date",
-      "Standard Accuracy",
-      "Email support",
-    ],
-    cta: "Choose Starter",
-    themeColor: "hsl(var(--accent))",
-  },
-  {
-    id: "plus",
-    name: "Plus",
-    price: "$69.99",
-    priceFrequency: "/mo",
-    features: [
-      "Up to 30 projects",
-      "1500 minutes of transcription per month",
-      "Projects saved for up to 15 days from creation date",
-      "Standard Accuracy",
-      "Speaker identification",
-      "Multiple file exports (TXT, DOCX)",
-      "Priority email support",
-    ],
-    cta: "Choose Plus",
-    isPopular: true,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$199",
-    priceFrequency: "/mo",
-    features: [
-      "Up to 100 projects",
-      "5000 minutes of transcription per month",
-      "Projects saved for up to 3 months from creation date",
-      "Small teams up to 5 members",
-      "Standard Accuracy",
-      "Advanced speaker identification",
-      "All export formats (TXT, DOCX, SRT, VTT)",
-      "API access",
-      "Dedicated account manager & phone support",
-    ],
-    cta: "Choose Pro",
-    themeColor: "hsl(var(--secondary))",
-  },
-];
-
 export default function PlanSelectionPage() {
   const router = useRouter();
   const { toast } = useToast();
+
+  const handleSelectPlan = async (planName: string) => {
+    // Simulate API call to save plan choice
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast({
+      title: `Plan Selected: ${planName}`,
+      description: "Your plan has been updated. Redirecting to your dashboard...",
+    });
+    router.push("/dashboard"); // Redirect to dashboard
+  };
 
   const handleSkip = async () => {
      // Simulate API call to default to Free plan
     await new Promise(resolve => setTimeout(resolve, 500));
     toast({
       title: "Skipped Plan Selection",
-      description: "You'll continue with the Free plan. You can upgrade anytime.",
+      description: "You'll continue with the Free plan. Redirecting to your dashboard...",
     });
-    router.push("/"); // Redirect to dashboard or home
+    router.push("/dashboard"); // Redirect to dashboard
   };
 
   return (
@@ -100,8 +42,8 @@ export default function PlanSelectionPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
-        {plansData.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} />
+        {DISPLAY_PLANS.map((plan) => (
+          <PlanCard key={plan.id} plan={plan} onSelectPlan={handleSelectPlan} />
         ))}
       </div>
 
