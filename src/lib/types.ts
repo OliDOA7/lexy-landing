@@ -32,28 +32,25 @@ export interface TranscriptionSegment {
 }
 
 export type ProjectStatus = 
-  | "Draft" // Initial state, file not yet uploaded or processing not started
-  | "Uploaded" // File uploaded to storage, awaiting transcription trigger
+  | "Draft" // Initial state after creation, before audio upload in editor
+  | "Uploaded" // File uploaded to storage (via editor), awaiting transcription trigger
   | "PendingTranscription" // User triggered transcription, waiting for function pickup
   | "ProcessingTranscription" // Cloud function is actively processing
   | "Completed" // Transcription successful, data available
-  | "Error" // General error
-  | "ErrorTranscription" // Specific error during transcription process
-  | "Processing"; // Legacy or general processing state, to be refined
+  | "Error" // General error not related to transcription
+  | "ErrorTranscription"; // Specific error during transcription process
 
 export interface Project {
   id: string;
   ownerId: string;
   name: string;
-  duration: number; // in minutes, can be an estimate initially
+  duration: number; // in minutes, 0 if not set, updated after audio processing
   language: string; // User-selected or auto-detected language code
   createdAt: Date; // Using Date object for easier manipulation
   status: ProjectStatus;
   storagePath?: string; // Path to audio file in Firebase Storage, e.g., "gs://bucket/audio/{userId}/{projectId}/filename.mp3"
-  fileURL?: string; // Publicly accessible URL if generated, otherwise use storagePath to fetch
-  // Transcript can be the raw segments, or the processed HTML string after CF processing.
-  // For display, if it's a string, it's assumed to be HTML.
-  transcript?: TranscriptionSegment[] | string; 
+  // fileURL is deprecated in favor of dynamically generating from storagePath if needed
+  transcript?: TranscriptionSegment[] | string; // Can be segments array or HTML string
   fileType?: string; // e.g., 'audio/mpeg', 'audio/wav'
   fileSize?: number; // in bytes
   expiresAt?: Date; // Date when the project (especially audio file) expires

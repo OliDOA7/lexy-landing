@@ -18,8 +18,6 @@ const mockUser: UserProfile = {
   planId: "plus", 
 };
 
-// Removed mockProjectsInitial to stop generating dummy data
-
 
 export default function DashboardPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -41,17 +39,15 @@ export default function DashboardPage() {
       setCurrentPlanConfig(planConfig);
       
       if (typeof window !== 'undefined') {
-        // Initialize global mock store as an empty array if it doesn't exist.
         if (!(window as any).mockProjects) {
           (window as any).mockProjects = []; 
         }
         
-        // Always read from the global mock store for the dashboard's local state
         const globalMockProjects: any[] = (window as any).mockProjects || [];
         const userProjects = globalMockProjects
             .map((p: any) => ({ 
                 ...p,
-                createdAt: new Date(p.createdAt), // Re-hydrate dates from ISO strings
+                createdAt: new Date(p.createdAt), 
                 expiresAt: p.expiresAt ? new Date(p.expiresAt) : undefined,
             }))
             .filter((p: Project) => p.ownerId === mockUser.uid);
@@ -72,7 +68,7 @@ export default function DashboardPage() {
   }, [refreshTrigger]); 
 
   const handleAddProject = async (
-    projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "storagePath" | "transcript" | "expiresAt"> & { audioFile: File }
+    projectData: Pick<Project, "name" | "language">
   ): Promise<string | null> => {
     if (!user || !currentPlanConfig) {
       toast({ title: "Error", description: "User or plan data is missing.", variant: "destructive" });
@@ -81,24 +77,20 @@ export default function DashboardPage() {
 
     setIsLoading(true); 
     const newProjectId = `proj${Date.now()}`;
-    // Updated storagePath to include the full gs:// URI
-    const storagePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${user.uid}/${newProjectId}/${projectData.audioFile.name}`;
     
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
-    console.log(`Simulated upload of ${projectData.audioFile.name} to ${storagePath}`);
+    // Simulate a short delay for project creation
+    await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const newProject: Project = {
       id: newProjectId,
       ownerId: user.uid,
       name: projectData.name,
       language: projectData.language,
-      duration: projectData.duration, 
+      duration: 0, // Will be set after audio upload in editor
       createdAt: new Date(),
-      status: "Uploaded" as ProjectStatus,
-      storagePath: storagePath,
-      fileType: projectData.fileType,
-      fileSize: projectData.fileSize,
-      expiresAt: addDays(new Date(), currentPlanConfig.storageDays ?? 0),
+      status: "Draft" as ProjectStatus, // Initial status
+      // storagePath, fileType, fileSize will be set in editor after file upload
+      expiresAt: addDays(new Date(), currentPlanConfig.storageDays ?? 0), // Expiry based on plan
       transcript: [], 
     };
 
@@ -108,7 +100,7 @@ export default function DashboardPage() {
         if (!(window as any).mockProjects) { (window as any).mockProjects = []; }
         (window as any).mockProjects.unshift({
             ...newProject,
-            createdAt: newProject.createdAt.toISOString(),
+            createdAt: newProject.createdAt.toISOString(), // Store as ISO string
             expiresAt: newProject.expiresAt ? newProject.expiresAt.toISOString() : undefined,
         });
     }
@@ -117,9 +109,9 @@ export default function DashboardPage() {
     
     toast({
       title: "Project Created",
-      description: `"${newProject.name}" created. Redirecting to editor for transcription...`,
+      description: `"${newProject.name}" created. Redirecting to editor to upload audio...`,
     });
-    router.push(`/editor/${newProjectId}?new=true`);
+    router.push(`/editor/${newProjectId}?new=true`); // Indicate it's a new project
     return newProjectId;
   };
 
