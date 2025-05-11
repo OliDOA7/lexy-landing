@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -18,26 +17,42 @@ const mockFirebase = {
   getProject: async (projectId: string, userId: string): Promise<Project | null> => {
     console.log(`Mock Firebase: Fetching project ${projectId} for user ${userId}`);
     await new Promise(resolve => setTimeout(resolve, 500));
-    // Find in mock initial data or a temporary store if updated
-    const project = (window as any).mockProjects?.find((p: Project) => p.id === projectId && p.ownerId === userId) || null;
-    if (project) return {...project, createdAt: new Date(project.createdAt), expiresAt: project.expiresAt ? new Date(project.expiresAt) : undefined};
+    
+    if (typeof window !== 'undefined' && (window as any).mockProjects) {
+      const projectFromGlobalStore = (window as any).mockProjects.find((p: any) => p.id === projectId && p.ownerId === userId);
+      if (projectFromGlobalStore) {
+        // Ensure dates are re-hydrated to Date objects
+        return {
+          ...projectFromGlobalStore,
+          createdAt: new Date(projectFromGlobalStore.createdAt),
+          expiresAt: projectFromGlobalStore.expiresAt ? new Date(projectFromGlobalStore.expiresAt) : undefined,
+          // transcript should already be in the correct format
+        };
+      }
+    }
     return null;
   },
   // Simulate updating a project in Firestore
   updateProject: async (projectId: string, userId: string, updates: Partial<Project>): Promise<boolean> => {
     console.log(`Mock Firebase: Updating project ${projectId} for user ${userId} with`, updates);
     await new Promise(resolve => setTimeout(resolve, 500));
-    if ((window as any).mockProjects) {
-        const projectIndex = (window as any).mockProjects.findIndex((p: Project) => p.id === projectId && p.ownerId === userId);
+
+    if (typeof window !== 'undefined' && (window as any).mockProjects) {
+        const projectIndex = (window as any).mockProjects.findIndex((p: any) => p.id === projectId && p.ownerId === userId);
         if (projectIndex !== -1) {
-            (window as any).mockProjects[projectIndex] = { ...(window as any).mockProjects[projectIndex], ...updates };
-            // Ensure dates are correctly handled if they are stringified
-            if (updates.createdAt && typeof updates.createdAt === 'string') {
-              (window as any).mockProjects[projectIndex].createdAt = new Date(updates.createdAt);
+            // Prepare updates, ensuring dates are stored as ISO strings in the global mock
+            const updatesForGlobalStore: any = { ...updates };
+            if (updates.createdAt instanceof Date) {
+              updatesForGlobalStore.createdAt = updates.createdAt.toISOString();
             }
-            if (updates.expiresAt && typeof updates.expiresAt === 'string') {
-              (window as any).mockProjects[projectIndex].expiresAt = new Date(updates.expiresAt);
+            if (updates.expiresAt instanceof Date) {
+              updatesForGlobalStore.expiresAt = updates.expiresAt.toISOString();
             }
+            
+            (window as any).mockProjects[projectIndex] = { 
+              ...(window as any).mockProjects[projectIndex], 
+              ...updatesForGlobalStore 
+            };
             return true;
         }
     }
@@ -61,13 +76,10 @@ const mockFirebase = {
   }
 };
 
-// Initialize mock projects globally for persistence across mock calls (for demo only)
+// Initialize (window as any).mockProjects as an empty array if it's not already defined.
+// DashboardPage should be the primary initializer with actual mock data.
 if (typeof window !== 'undefined' && !(window as any).mockProjects) {
-    (window as any).mockProjects = [ 
-        { id: "proj1", ownerId: "user123abc", name: "Client Interview - Alpha Project", duration: 15, language: "en-US", createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), status: "Completed", storagePath: "audio/user123abc/proj1/mock-alpha.mp3", transcript: [{timestamp: "00:00:10", speaker: "Speaker A", text: "This is a transcript for the Alpha project..."}], fileType: "audio/mpeg", fileSize: 15728640, expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: "proj2", ownerId: "user123abc", name: "Internal Brainstorming Session - Project Beta", duration: 45, language: "es-ES", createdAt: new Date(Date.now() - 86400000 * 1).toISOString(), status: "ProcessingTranscription", storagePath: "audio/user123abc/proj2/mock-beta.wav", fileType: "audio/wav", fileSize: 47185920, expiresAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: "proj3", ownerId: "user123abc", name: "Lecture Recording - Gamma Initiative", duration: 5, language: "fr-FR", createdAt: new Date().toISOString(), status: "Uploaded", storagePath: "audio/user123abc/proj3/mock-gamma.mp3", fileType: "audio/mpeg", fileSize: 5242880, transcript: [], expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString() },
-    ];
+    (window as any).mockProjects = []; 
 }
 
 
@@ -155,7 +167,14 @@ export default function EditorPage() {
         audioStoragePath: audioUrlForGenkit,
         languageHint: project.language === "auto" ? undefined : project.language,
       };
-      const result = await transcribeAudio(input);
+      // Simulate transcription delay
+      await new Promise(resolve => setTimeout(resolve, 3000)); 
+      const result: TranscriptionSegment[] = [
+          { timestamp: "00:00:05", speaker: "Operator", text: "This call is from a correctional facility." },
+          { timestamp: "00:00:10", speaker: "Speaker A", text: "Hello, this is a mock transcription result." },
+          { timestamp: "00:00:15", speaker: "Speaker B", text: "Okay, I understand. This is <u>mock</u> data." }
+      ];
+      // const result = await transcribeAudio(input); // Actual call
       setTranscription(result);
       setHasUnsavedChanges(true);
       await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: result, status: "Completed" as ProjectStatus });
@@ -169,8 +188,11 @@ export default function EditorPage() {
       setProject(prev => prev ? {...prev, status: "ErrorTranscription" as ProjectStatus} : null);
     } finally {
       setIsTranscribing(false);
+       if (searchParams.get('new') === 'true') {
+         router.replace(`/editor/${projectId}`, { shallow: true }); // Remove ?new=true after processing
+      }
     }
-  }, [project, currentUser, projectId, toast, setProject, setTranscription, setIsTranscribing, setErrorState, setHasUnsavedChanges, router, searchParams]);
+  }, [project, currentUser, projectId, toast, router, searchParams]);
 
 
   // Auto-transcription for new projects
@@ -186,10 +208,9 @@ export default function EditorPage() {
       !isTranscribing 
     ) {
       memoizedHandleTranscribe();
-      router.replace(`/editor/${projectId}`, { shallow: true });
+      // router.replace(`/editor/${projectId}`, { shallow: true }); // Moved to finally block of memoizedHandleTranscribe
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project, currentUser, isLoadingProject, isTranscribing, searchParams, projectId, router, memoizedHandleTranscribe]);
+  }, [project, currentUser, isLoadingProject, isTranscribing, searchParams, projectId, memoizedHandleTranscribe]);
 
 
   const handleSave = async () => {
@@ -197,7 +218,6 @@ export default function EditorPage() {
     setIsSaving(true);
     setErrorState({isError: false});
     try {
-      // Simulate saving transcript to Firestore. Audio is assumed to be in Storage.
       const success = await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: transcription, status: "Completed" as ProjectStatus });
       if (success) {
         setHasUnsavedChanges(false);
@@ -237,6 +257,7 @@ export default function EditorPage() {
   if (!project) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
+        <AlertTriangle className="h-16 w-16 text-destructive mx-auto mb-4" />
         <h1 className="text-2xl font-semibold text-destructive">Project Not Found</h1>
         <p className="text-muted-foreground mt-2">{errorState.message || "The project could not be loaded or you don't have access."}</p>
         <Button onClick={() => router.push("/dashboard")} className="mt-6">Go to Dashboard</Button>
@@ -245,7 +266,7 @@ export default function EditorPage() {
   }
   
   const showTranscribeButton = project && (project.status === "Uploaded" || project.status === "ErrorTranscription") && project.storagePath;
-  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || (project.status !== 'Completed' && project.status !== 'Draft');
+  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription" /* Allow saving even if transcription errored if user manually edits */) ;
 
 
   return (
@@ -256,7 +277,7 @@ export default function EditorPage() {
             <div className="flex-grow">
               <CardTitle className="text-2xl md:text-3xl">{project.name}</CardTitle>
               <CardDescription>
-                Language: {project.language} | Duration: {project.duration} min | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : 'text-blue-500'}`}>{project.status}</span>
+                Language: {project.language} | Duration: {project.duration} min | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : project.status === 'ProcessingTranscription' ? 'text-blue-500 animate-pulse' : 'text-blue-500'}`}>{project.status}</span>
                 {project.expiresAt && <p className="text-xs text-muted-foreground mt-1">Audio file expires: {new Date(project.expiresAt).toLocaleDateString()}</p>}
               </CardDescription>
             </div>
@@ -266,7 +287,7 @@ export default function EditorPage() {
                 Close
               </Button>
               {showTranscribeButton && (
-                <Button onClick={memoizedHandleTranscribe} disabled={isTranscribing || isSaving}>
+                <Button onClick={memoizedHandleTranscribe} disabled={isTranscribing || isSaving || isLoadingAudio}>
                   {isTranscribing ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -294,7 +315,7 @@ export default function EditorPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <MediaPlayer audioSrc={audioSrc} isLoading={isLoadingAudio} />
-          <TranscriptionTable segments={transcription} isLoading={isTranscribing && transcription.length === 0} />
+          <TranscriptionTable segments={transcription} isLoading={isTranscribing && transcription.length === 0 && project.status === 'ProcessingTranscription'} />
         </CardContent>
       </Card>
     </div>

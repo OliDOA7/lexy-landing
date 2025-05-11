@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState }from "react";
@@ -18,7 +17,7 @@ const mockUser: UserProfile = {
   planId: "starter", 
 };
 
-// Mock projects data - replace with Firestore fetching
+// Mock projects data - this is the *initial* template / default set if global mock is empty
 const mockProjectsInitial: Project[] = [
   {
     id: "proj1",
@@ -54,7 +53,7 @@ const mockProjectsInitial: Project[] = [
     duration: 5,
     language: "fr-FR",
     createdAt: new Date(),
-    status: "Uploaded", // Changed status to Uploaded for editor flow
+    status: "Uploaded", 
     storagePath: "audio/user123abc/proj3/mock-gamma.mp3",
     fileType: "audio/mpeg",
     fileSize: 5 * 1024 * 1024,
@@ -70,35 +69,67 @@ export default function DashboardPage() {
   const [currentPlanConfig, setCurrentPlanConfig] = useState<PlanConfig | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      await new Promise(resolve => setTimeout(resolve, 500)); // Shorter delay
       
-      setUser(mockUser);
+      setUser(mockUser); // Assume mockUser is fetched
       const planConfig = PLANS_CONFIG[mockUser.planId] || PLANS_CONFIG.free;
       setCurrentPlanConfig(planConfig);
       
-      setProjects(mockProjectsInitial.filter(p => p.ownerId === mockUser.uid));
+      if (typeof window !== 'undefined') {
+        if (!(window as any).mockProjects) {
+          // Initialize global mock store if it doesn't exist.
+          // Deep copy and ensure dates are handled correctly if they were strings.
+          (window as any).mockProjects = mockProjectsInitial.map(p => ({
+            ...p,
+            createdAt: p.createdAt.toISOString(), // Store as ISO string in global mock
+            expiresAt: p.expiresAt ? p.expiresAt.toISOString() : undefined,
+          }));
+        }
+        
+        // Always read from the global mock store for the dashboard's local state
+        const globalMockProjects: any[] = (window as any).mockProjects || [];
+        const userProjects = globalMockProjects
+            .map((p: any) => ({ // Re-hydrate dates from ISO strings
+                ...p,
+                createdAt: new Date(p.createdAt),
+                expiresAt: p.expiresAt ? new Date(p.expiresAt) : undefined,
+            }))
+            .filter((p: Project) => p.ownerId === mockUser.uid);
+        setProjects(userProjects);
+      }
       setIsLoading(false);
     };
     fetchData();
-  }, []);
+
+    const handleFocus = () => {
+        // console.log("Dashboard focused, triggering refresh from global mock");
+        setRefreshTrigger(prev => prev + 1); 
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+        window.removeEventListener('focus', handleFocus);
+    };
+
+  }, [refreshTrigger]); // Depend on refreshTrigger to re-run
 
   const handleAddProject = async (
     projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "storagePath" | "transcript" | "expiresAt"> & { audioFile: File }
-  ): Promise<string | null> => { // Return new project ID or null on failure
+  ): Promise<string | null> => {
     if (!user || !currentPlanConfig) {
       toast({ title: "Error", description: "User or plan data is missing.", variant: "destructive" });
       return null;
     }
 
-    setIsLoading(true);
+    setIsLoading(true); // Consider a more specific loading state like isCreatingProject
     const newProjectId = `proj${Date.now()}`;
     const storagePath = `audio/${user.uid}/${newProjectId}/${projectData.audioFile.name}`;
     
-    // Simulate file upload to Firebase Storage
     await new Promise(resolve => setTimeout(resolve, 1000)); 
     console.log(`Simulated upload of ${projectData.audioFile.name} to ${storagePath}`);
 
@@ -107,24 +138,29 @@ export default function DashboardPage() {
       ownerId: user.uid,
       name: projectData.name,
       language: projectData.language,
-      duration: projectData.duration, // Estimated duration
+      duration: projectData.duration, 
       createdAt: new Date(),
       status: "Uploaded" as ProjectStatus,
       storagePath: storagePath,
       fileType: projectData.fileType,
       fileSize: projectData.fileSize,
       expiresAt: addDays(new Date(), currentPlanConfig.storageDays ?? 0),
-      transcript: [], // Initialize with empty transcript
+      transcript: [], 
     };
 
-    // Simulate adding to Firestore and update local state
+    // Update local state for immediate UI feedback
     setProjects(prevProjects => [newProject, ...prevProjects]);
     
-    // Add to global mock projects for editor page to find if it's used there
-    if (typeof window !== 'undefined' && (window as any).mockProjects) {
-        (window as any).mockProjects.push(newProject);
+    // Update global mock projects store
+    if (typeof window !== 'undefined') {
+        if (!(window as any).mockProjects) { (window as any).mockProjects = []; }
+        // Store with ISO strings for dates for consistency if other parts serialize/deserialize
+        (window as any).mockProjects.unshift({
+            ...newProject,
+            createdAt: newProject.createdAt.toISOString(),
+            expiresAt: newProject.expiresAt ? newProject.expiresAt.toISOString() : undefined,
+        });
     }
-
 
     setIsLoading(false);
     
@@ -132,18 +168,20 @@ export default function DashboardPage() {
       title: "Project Created",
       description: `"${newProject.name}" created. Redirecting to editor for transcription...`,
     });
-    router.push(`/editor/${newProjectId}?new=true`); // Add ?new=true
+    router.push(`/editor/${newProjectId}?new=true`);
     return newProjectId;
   };
 
   const handleDeleteProject = async (projectId: string) => {
     setIsDeletingProject(true);
-    // Simulate project deletion from Firestore and Storage
     await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Update local state for immediate UI feedback
     setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-    // Also remove from mockProjects if it exists
+
+    // Update global mock projects store
      if (typeof window !== 'undefined' && (window as any).mockProjects) {
-        (window as any).mockProjects = (window as any).mockProjects.filter((p: Project) => p.id !== projectId);
+        (window as any).mockProjects = (window as any).mockProjects.filter((p: any) => p.id !== projectId);
     }
     toast({ title: "Project Deleted", description: "The project has been removed." });
     setIsDeletingProject(false);
@@ -151,12 +189,9 @@ export default function DashboardPage() {
 
   const [isDeletingProject, setIsDeletingProject] = useState(false);
 
-
   const handleEditProject = (project: Project) => {
-    // Navigate to the editor page for this project
     router.push(`/editor/${project.id}`);
   };
-
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-12">
