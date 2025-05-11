@@ -17,7 +17,7 @@ const Footer = () => {
             <p className="mt-1">Secure and Compliant Transcription Services.</p>
           </div>
 
-          <nav className="flex justify-center md:justify-end space-x-6">
+          <nav className="flex flex-wrap justify-center md:justify-end gap-x-4 sm:gap-x-6 gap-y-2">
             <Link href="/terms" className="hover:text-gray-200 transition-colors">Terms of Service</Link>
             <Link href="/privacy" className="hover:text-gray-200 transition-colors">Privacy Policy</Link>
             <Link href="/contact" className="hover:text-gray-200 transition-colors">Contact</Link>

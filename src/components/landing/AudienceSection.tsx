@@ -37,7 +37,7 @@ const AudienceSection = () => {
               alt="Diverse professionals using Lexy for audio transcription"
               layout="fill"
               objectFit="cover"
-              data-ai-hint="audio transcription"
+              data-ai-hint="text transcription"
             />
           </div>
         </div>

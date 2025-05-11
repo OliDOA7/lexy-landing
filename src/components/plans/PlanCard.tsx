@@ -45,7 +45,7 @@ const PlanCard = ({ plan }: PlanCardProps) => {
           {plan.name}
         </CardTitle>
         <CardDescription className="mt-2">
-          <span className="text-4xl font-bold text-foreground">{plan.price}</span>
+          <span className="text-3xl sm:text-4xl font-bold text-foreground">{plan.price}</span>
           <span className="text-muted-foreground">{plan.priceFrequency}</span>
         </CardDescription>
       </CardHeader>
