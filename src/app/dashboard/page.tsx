@@ -81,7 +81,8 @@ export default function DashboardPage() {
 
     setIsLoading(true); 
     const newProjectId = `proj${Date.now()}`;
-    const storagePath = `audio/${user.uid}/${newProjectId}/${projectData.audioFile.name}`;
+    // Updated storagePath to include the full gs:// URI
+    const storagePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${user.uid}/${newProjectId}/${projectData.audioFile.name}`;
     
     await new Promise(resolve => setTimeout(resolve, 1000)); 
     console.log(`Simulated upload of ${projectData.audioFile.name} to ${storagePath}`);
@@ -156,3 +157,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
