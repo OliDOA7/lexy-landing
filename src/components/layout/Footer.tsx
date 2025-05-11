@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
           <div className="flex justify-center md:justify-start">
-            <AppLogo /> {/* Note: AppLogo default color is primary, might need adjustment for dark bg or override here */}
+            <AppLogo />
           </div>
           
           <div className="text-center text-sm">
@@ -29,8 +29,3 @@ const Footer = () => {
 };
 
 export default Footer;
-
-// Placeholder pages for links in footer (optional, can be removed if not needed)
-// You would create these files in src/app/terms/page.tsx etc.
-// For example, src/app/terms/page.tsx:
-// export default function TermsPage() { return <div className="container py-8"><h1>Terms of Service</h1><p>...</p></div>; }
