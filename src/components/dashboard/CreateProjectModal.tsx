@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type DragEvent } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { PlanConfig, Project, UserProfile } from "@/lib/types";
 import { Loader2, UploadCloud } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const supportedLanguages = [
   { value: "en-US", label: "English (US)" },
@@ -35,13 +37,16 @@ const supportedLanguages = [
   { value: "auto", label: "Auto-detect Language" },
 ];
 
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const projectSchema = z.object({
   projectName: z.string().min(3, "Project name must be at least 3 characters").max(100),
   language: z.string().min(1, "Please select a language"),
   audioFile: z.custom<FileList>()
     .refine(files => files && files.length > 0, "Audio file is required.")
-    .refine(files => files && files[0]?.type.startsWith("audio/"), "File must be an audio type (MP3, WAV, M4A).")
-    .refine(files => files && files[0]?.size <= 50 * 1024 * 1024, "File size must be 50MB or less."), // Example: 50MB limit
+    .refine(files => files && files[0]?.type.startsWith("audio/"), `File must be an audio type (MP3, WAV, M4A).`)
+    .refine(files => files && files[0]?.size <= MAX_FILE_SIZE_BYTES, `File size must be ${MAX_FILE_SIZE_MB}MB or less.`),
 });
 
 type ProjectFormData = z.infer<typeof projectSchema>;
@@ -59,8 +64,10 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<ProjectFormData>({
+
+  const { control, handleSubmit, reset, watch, formState: { errors }, setValue } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       projectName: "",
@@ -78,6 +85,46 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
       setFileName(null);
     }
   }, [audioFileWatch]);
+
+  const validateFile = (file: File): boolean => {
+    if (!file.type.startsWith("audio/")) {
+      toast({ title: "Invalid File Type", description: "Please upload an audio file (MP3, WAV, M4A).", variant: "destructive" });
+      return false;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast({ title: "File Too Large", description: `File size must be ${MAX_FILE_SIZE_MB}MB or less.`, variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(false);
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (validateFile(file)) {
+        setValue("audioFile", files, { shouldValidate: true });
+      } else {
+        setValue("audioFile", undefined, { shouldValidate: true }); // Clear if invalid
+      }
+    }
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
 
   const onSubmit: SubmitHandler<ProjectFormData> = async (data) => {
     if (!user || !currentPlanConfig) {
@@ -146,7 +193,7 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
         <DialogHeader>
           <DialogTitle className="text-2xl">Create New Project</DialogTitle>
           <DialogDescription>
-            Upload your audio file (MP3, WAV, M4A - Max 50MB) and provide details.
+            Upload your audio file (MP3, WAV, M4A - Max {MAX_FILE_SIZE_MB}MB) and provide details.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4">
@@ -183,7 +230,15 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
           
           <div>
             <Label htmlFor="audioFile-input">Audio File</Label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md border-border hover:border-primary transition-colors">
+            <div 
+              className={cn(
+                "mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md border-border hover:border-primary transition-colors",
+                isDraggingOver && "border-primary bg-primary/10"
+              )}
+              onDrop={handleFileDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+            >
               <div className="space-y-1 text-center">
                 <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                 <div className="flex text-sm text-muted-foreground">
@@ -195,7 +250,7 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
                      <Controller
                         name="audioFile"
                         control={control}
-                        render={({ field: { onChange, onBlur, name, ref } }) => (
+                        render={({ field: { onChange: onRHFChange, onBlur, name, ref } }) => (
                             <input 
                                 id="audioFile-input" 
                                 type="file" 
@@ -204,7 +259,20 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
                                 name={name}
                                 ref={ref}
                                 onBlur={onBlur}
-                                onChange={(e) => onChange(e.target.files)}
+                                onChange={(e) => {
+                                  const selectedFiles = e.target.files;
+                                  if (selectedFiles && selectedFiles.length > 0) {
+                                    const file = selectedFiles[0];
+                                    if (validateFile(file)) {
+                                      onRHFChange(selectedFiles);
+                                    } else {
+                                      e.target.value = ''; // Clear the input visually
+                                      onRHFChange(undefined); // Clear RHF state
+                                    }
+                                  } else {
+                                    onRHFChange(undefined); // Clear RHF state if no file selected
+                                  }
+                                }}
                             />
                         )}
                     />
@@ -212,7 +280,7 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
                   <p className="pl-1">or drag and drop</p>
                 </div>
                 {fileName && <p className="text-xs text-accent pt-1">{fileName}</p>}
-                {!fileName && <p className="text-xs text-muted-foreground">MP3, WAV, M4A up to 50MB</p>}
+                {!fileName && <p className="text-xs text-muted-foreground">MP3, WAV, M4A up to {MAX_FILE_SIZE_MB}MB</p>}
               </div>
             </div>
             {errors.audioFile && <p className="text-sm text-destructive mt-1">{errors.audioFile.message as string}</p>}
