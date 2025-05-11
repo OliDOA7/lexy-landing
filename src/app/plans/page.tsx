@@ -1,3 +1,4 @@
+
 "use client";
 
 import PlanCard from "@/components/plans/PlanCard";
@@ -13,9 +14,10 @@ const plansData: Plan[] = [
     price: "$0",
     priceFrequency: "/month",
     features: [
-      "Up to 30 minutes of transcription per month",
-      "Standard accuracy",
-      "Basic file export (TXT)",
+      "1 project",
+      "3 minutes of transcription per day",
+      "Standard Accuracy",
+      "Unable to save project in cloud",
       "Community support",
     ],
     cta: "Start with Free",
@@ -24,13 +26,13 @@ const plansData: Plan[] = [
   {
     id: "starter",
     name: "Starter",
-    price: "$15",
-    priceFrequency: "/month",
+    price: "$19.99",
+    priceFrequency: "/mo",
     features: [
-      "Up to 300 minutes of transcription per month",
-      "Improved accuracy",
-      "Speaker identification (up to 2 speakers)",
-      "Multiple file exports (TXT, DOCX)",
+      "Up to 5 projects",
+      "45 minutes of transcription per day",
+      "Projects saved for up to 5 days from creation date",
+      "Standard Accuracy",
       "Email support",
     ],
     cta: "Choose Starter",
@@ -39,32 +41,35 @@ const plansData: Plan[] = [
   {
     id: "plus",
     name: "Plus",
-    price: "$29",
-    priceFrequency: "/month",
+    price: "$69.99",
+    priceFrequency: "/mo",
     features: [
-      "Up to 1000 minutes of transcription per month",
-      "High accuracy & faster processing",
-      "Advanced speaker identification (up to 5 speakers)",
-      "All export formats (TXT, DOCX, SRT, VTT)",
+      "Up to 30 projects",
+      "1500 minutes of transcription per month",
+      "Projects saved for up to 15 days from creation date",
+      "Standard Accuracy",
+      "Speaker identification",
+      "Multiple file exports (TXT, DOCX)",
       "Priority email support",
-      "Custom vocabulary",
     ],
     cta: "Choose Plus",
-    isPopular: true, // This will use primary color by default in PlanCard
+    isPopular: true,
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$59",
-    priceFrequency: "/month",
+    price: "$199",
+    priceFrequency: "/mo",
     features: [
-      "Up to 3000 minutes of transcription per month",
-      "Highest accuracy & dedicated processing queue",
-      "Unlimited speaker identification",
-      "All export formats & API access",
+      "Up to 100 projects",
+      "5000 minutes of transcription per month",
+      "Projects saved for up to 3 months from creation date",
+      "Small teams up to 5 members",
+      "Standard Accuracy",
+      "Advanced speaker identification",
+      "All export formats (TXT, DOCX, SRT, VTT)",
+      "API access",
       "Dedicated account manager & phone support",
-      "Team collaboration features",
-      "Volume discounts available",
     ],
     cta: "Choose Pro",
     themeColor: "hsl(var(--secondary))",
@@ -90,7 +95,7 @@ export default function PlanSelectionPage() {
       <header className="text-center mb-12 md:mb-16">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Choose Your Lexy Plan</h1>
         <p className="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto">
-          Select the perfect plan to fit your transcription needs. All plans come with our commitment to security and accuracy.
+          Select the perfect plan to fit your transcription needs. All plans offer reliable accuracy and processing.
         </p>
       </header>
 
@@ -107,7 +112,7 @@ export default function PlanSelectionPage() {
       </div>
       
       <div className="mt-12 text-center text-sm text-muted-foreground">
-        <p>* Fair use policy applies for unlimited minutes. All prices are in USD. You can cancel or change your plan anytime.</p>
+        <p>* Fair use policy applies for transcription minutes. All prices are in USD. You can cancel or change your plan anytime.</p>
       </div>
     </div>
   );

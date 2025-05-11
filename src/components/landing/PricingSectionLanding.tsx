@@ -1,3 +1,4 @@
+
 import type { Plan } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,24 +11,32 @@ const plans: Plan[] = [
     name: "Free",
     price: "$0",
     priceFrequency: "/month",
-    features: ["Basic transcription", "Limited minutes", "Standard support"],
+    features: ["1 project", "3 mins/day transcription", "Standard Accuracy", "Local storage only"],
     cta: "Get Started",
   },
   {
     id: "starter",
     name: "Starter",
-    price: "$15",
-    priceFrequency: "/month",
-    features: ["More minutes", "Speaker identification", "Priority support"],
+    price: "$19.99",
+    priceFrequency: "/mo",
+    features: ["5 projects", "45 mins/day transcription", "5-day cloud storage"],
     cta: "Choose Starter",
+  },
+  {
+    id: "plus",
+    name: "Plus",
+    price: "$69.99",
+    priceFrequency: "/mo",
+    features: ["30 projects", "1500 mins/month", "15-day cloud storage", "Speaker ID"],
+    cta: "Choose Plus",
     isPopular: true,
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$45",
-    priceFrequency: "/month",
-    features: ["Unlimited minutes*", "Advanced features", "Dedicated support"],
+    price: "$199",
+    priceFrequency: "/mo",
+    features: ["100 projects, 5 members", "5000 mins/month", "3-month cloud storage", "API Access"],
     cta: "Choose Pro",
   },
 ];
@@ -42,7 +51,7 @@ const PricingSectionLanding = () => {
             Choose the plan that's right for you. No hidden fees, upgrade or downgrade anytime.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {plans.map((plan) => (
             <Card key={plan.id} className={`flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 ${plan.isPopular ? 'border-primary border-2 relative' : ''}`}>
               {plan.isPopular && (
@@ -61,7 +70,7 @@ const PricingSectionLanding = () => {
                 <ul className="space-y-2">
                   {plan.features.map((feature, index) => (
                     <li key={index} className="flex items-center">
-                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
