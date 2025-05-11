@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -36,7 +37,7 @@ const ComplianceModal = ({ isOpen, onClose, onAcknowledge }: ComplianceModalProp
               <strong>NDA Protection:</strong> All data processed through Lexy is treated with strict confidentiality, akin to Non-Disclosure Agreement standards. Your proprietary information is secure.
             </p>
             <p>
-              <strong>Authorized Use of BOP Transcriptions:</strong> You confirm that you have the necessary rights and authorizations to transcribe any audio or video content, especially those involving identifiable individuals or groups (Body of Persons - BOP). Lexy is to be used responsibly and legally.
+              <strong>Authorized Use of BOP Transcriptions:</strong> You confirm that you have the necessary rights and authorizations to transcribe any audio or video content, especially those involving identifiable individuals or groups, and specifically any content related to the Bureau of Prisons (BOP). Lexy is to be used responsibly and legally.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>

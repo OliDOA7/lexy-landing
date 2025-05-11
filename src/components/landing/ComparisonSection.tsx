@@ -42,7 +42,7 @@ const ComparisonSection = () => {
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">NDA & BOP Compliance Focus</TableCell>
+                <TableCell className="font-medium">NDA &amp; Bureau of Prisons (BOP) Compliance Focus</TableCell>
                 <TableCell className="text-center">
                   <CheckCircle className="h-6 w-6 text-green-500 mx-auto" />
                 </TableCell>

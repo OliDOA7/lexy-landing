@@ -26,7 +26,7 @@ const ComplianceInfoSection = () => {
               <div>
                 <h3 className="text-xl font-semibold mb-2">Authorized Use</h3>
                 <p className="text-muted-foreground">
-                  Lexy is intended for transcribing audio/video for which you have proper authorization, especially concerning Body of Persons (BOP) recordings and other sensitive materials.
+                  Lexy is intended for transcribing audio/video for which you have proper authorization, especially concerning Bureau of Prisons (BOP) recordings and other sensitive materials.
                 </p>
               </div>
             </div>

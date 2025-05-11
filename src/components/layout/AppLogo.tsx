@@ -1,9 +1,13 @@
+
 import Link from 'next/link';
 
 const AppLogo = () => {
   return (
-    <Link href="/" className="text-2xl font-bold text-primary hover:opacity-80 transition-opacity">
-      Lexy
+    <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
+      <span className="text-2xl font-bold text-primary">Lexy</span>
+      <span className="block text-xs text-muted-foreground">
+        powered by How2 Studio
+      </span>
     </Link>
   );
 };
