@@ -13,10 +13,14 @@ import { z } from 'genkit';
 import type { TranscriptionSegment } from '@/lib/types'; // Re-use type from lib
 
 // Example of how an API key from .env might be accessed if using a different transcription service:
-// const CUSTOM_TRANSCRIPTION_API_KEY = process.env.LEXY_TRANSCRIPTION_API_KEY;
-// if (!CUSTOM_TRANSCRIPTION_API_KEY && someConditionToUseCustomApi) {
-//   console.warn("Custom transcription API key is not set in .env file.");
-// }
+const CUSTOM_TRANSCRIPTION_API_KEY = process.env.LEXY_TRANSCRIPTION_API_KEY;
+// A placeholder condition for when to use the custom API key. 
+// In a real application, this would be based on configuration or logic.
+const someConditionToUseCustomApi = false; 
+
+if (!CUSTOM_TRANSCRIPTION_API_KEY && someConditionToUseCustomApi) {
+  console.warn("Custom transcription API key is not set in .env file but was expected.");
+}
 
 const TranscribeAudioInputSchema = z.object({
   audioStoragePath: z
@@ -153,11 +157,17 @@ const transcribeAudioFlow = ai.defineFlow(
   },
   async (input) => {
     console.log("Transcribing audio with input:", input);
-    // If using a custom API key for a different service, you might access it here:
-    // const apiKey = process.env.LEXY_TRANSCRIPTION_API_KEY;
-    // And then use it when calling that service.
-    // The current flow uses Google AI, configured via the googleAI plugin.
+    if (someConditionToUseCustomApi && CUSTOM_TRANSCRIPTION_API_KEY) {
+      // Placeholder for logic using the custom API key
+      console.log("Using custom transcription API key:", CUSTOM_TRANSCRIPTION_API_KEY.substring(0, 10) + "..."); 
+      // This is where you would make a call to your custom transcription service.
+      // For now, it will fall through to the Google AI model if not implemented.
+      // Example:
+      // const customApiResult = await callMyCustomTranscriptionService(input.audioStoragePath, CUSTOM_TRANSCRIPTION_API_KEY);
+      // return parseCustomApiResultToSchema(customApiResult);
+    }
 
+    // The current flow uses Google AI, configured via the googleAI plugin by default.
     try {
       // The model is expected to return a JSON string that parses into TranscribeAudioOutput.
       // The definePrompt with outputSchema handles parsing the model's raw text output into JSON.
