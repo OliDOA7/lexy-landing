@@ -12,6 +12,12 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import type { TranscriptionSegment } from '@/lib/types'; // Re-use type from lib
 
+// Example of how an API key from .env might be accessed if using a different transcription service:
+// const CUSTOM_TRANSCRIPTION_API_KEY = process.env.LEXY_TRANSCRIPTION_API_KEY;
+// if (!CUSTOM_TRANSCRIPTION_API_KEY && someConditionToUseCustomApi) {
+//   console.warn("Custom transcription API key is not set in .env file.");
+// }
+
 const TranscribeAudioInputSchema = z.object({
   audioStoragePath: z
     .string()
@@ -147,6 +153,11 @@ const transcribeAudioFlow = ai.defineFlow(
   },
   async (input) => {
     console.log("Transcribing audio with input:", input);
+    // If using a custom API key for a different service, you might access it here:
+    // const apiKey = process.env.LEXY_TRANSCRIPTION_API_KEY;
+    // And then use it when calling that service.
+    // The current flow uses Google AI, configured via the googleAI plugin.
+
     try {
       // The model is expected to return a JSON string that parses into TranscribeAudioOutput.
       // The definePrompt with outputSchema handles parsing the model's raw text output into JSON.
