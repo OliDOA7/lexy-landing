@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -50,7 +49,6 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // onCreateProject is now onAddProject in DashboardPage, which returns project ID or null
   onAddProject: (projectData: Omit<Project, "id" | "ownerId" | "createdAt" | "status" | "storagePath" | "transcript" | "expiresAt"> & { audioFile: File }) => Promise<string | null>;
   user: UserProfile | null;
   currentPlanConfig: PlanConfig | null;
@@ -62,7 +60,7 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
 
-  const { control, register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProjectFormData>({
+  const { control, handleSubmit, reset, watch, formState: { errors } } = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       projectName: "",
@@ -93,11 +91,9 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
     }
     
     const audioFile = data.audioFile[0];
-    // Estimate duration: 1 minute per MB as a rough guide. More accurate on server.
     const estimatedDuration = Math.ceil(audioFile.size / (1024 * 1024)); 
     
     let limitExceeded = false;
-    // Check minute limits (simplified for client-side, actual check might be more robust on server before processing)
     if (currentPlanConfig.minuteLimitDaily) {
         const dailyMinutesUsed = projects
             .filter(p => new Date(p.createdAt).toDateString() === new Date().toDateString())
@@ -131,11 +127,9 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
       });
 
       if (newProjectId) {
-        // Navigation is handled by onAddProject's caller (DashboardPage)
         reset();
         onClose();
       } else {
-        // Error handled by onAddProject, or generic message here
         toast({ title: "Creation Failed", description: "Could not create project. Please try again.", variant: "destructive" });
       }
     } catch (error) {
@@ -158,7 +152,11 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4">
           <div>
             <Label htmlFor="projectName">Project Name</Label>
-            <Input id="projectName" {...register("projectName")} placeholder="e.g., Weekly Team Meeting" className="mt-1 bg-background" />
+            <Controller
+                name="projectName"
+                control={control}
+                render={({ field }) => <Input id="projectName" {...field} placeholder="e.g., Weekly Team Meeting" className="mt-1 bg-background" />}
+            />
             {errors.projectName && <p className="text-sm text-destructive mt-1">{errors.projectName.message}</p>}
           </div>
 
@@ -194,7 +192,22 @@ const CreateProjectModal = ({ isOpen, onClose, onAddProject, user, currentPlanCo
                     className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
                   >
                     <span>Upload a file</span>
-                    <input id="audioFile-input" type="file" className="sr-only" {...register("audioFile")} accept="audio/mpeg,audio/wav,audio/x-m4a,audio/m4a" />
+                     <Controller
+                        name="audioFile"
+                        control={control}
+                        render={({ field: { onChange, onBlur, name, ref } }) => (
+                            <input 
+                                id="audioFile-input" 
+                                type="file" 
+                                className="sr-only" 
+                                accept="audio/mpeg,audio/wav,audio/x-m4a,audio/m4a"
+                                name={name}
+                                ref={ref}
+                                onBlur={onBlur}
+                                onChange={(e) => onChange(e.target.files)}
+                            />
+                        )}
+                    />
                   </label>
                   <p className="pl-1">or drag and drop</p>
                 </div>
