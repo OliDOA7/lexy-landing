@@ -15,7 +15,7 @@ const mockUser: UserProfile = {
   uid: "user123abc",
   name: "Demo User",
   email: "demo@example.com",
-  planId: "starter", 
+  planId: "plus", 
 };
 
 // Removed mockProjectsInitial to stop generating dummy data
