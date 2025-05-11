@@ -28,7 +28,7 @@ export interface UserProfile {
 export interface TranscriptionSegment {
   timestamp: string; // Format: [HH:MM:SS]
   speaker: string;   // e.g., Operator, Speaker A, UM1 (no colon)
-  text: string;
+  text: string;      // Transcribed text, potentially with <u> HTML tags
 }
 
 export type ProjectStatus = 
@@ -49,9 +49,11 @@ export interface Project {
   language: string; // User-selected or auto-detected language code
   createdAt: Date; // Using Date object for easier manipulation
   status: ProjectStatus;
-  storagePath?: string; // Path to audio file in Firebase Storage, e.g., "audio/{userId}/{projectId}/filename.mp3"
+  storagePath?: string; // Path to audio file in Firebase Storage, e.g., "gs://bucket/audio/{userId}/{projectId}/filename.mp3"
   fileURL?: string; // Publicly accessible URL if generated, otherwise use storagePath to fetch
-  transcript?: TranscriptionSegment[]; // Array of transcription segments
+  // Transcript can be the raw segments, or the processed HTML string after CF processing.
+  // For display, if it's a string, it's assumed to be HTML.
+  transcript?: TranscriptionSegment[] | string; 
   fileType?: string; // e.g., 'audio/mpeg', 'audio/wav'
   fileSize?: number; // in bytes
   expiresAt?: Date; // Date when the project (especially audio file) expires

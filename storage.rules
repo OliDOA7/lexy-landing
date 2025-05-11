@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Files:
+    // - public: Accessible by anyone
+    // - {userId}/{fileName}: Only accessible by the authenticated user
+    // - {userId}/{projectId}/{fileName}: Only accessible by the authenticated user who owns the project
+
+    // Allow public read for general assets if any (e.g. profile pictures if public)
+    // match /public/{allPaths=**} {
+    //   allow read;
+    // }
+
+    // User-specific files (e.g., avatars, private documents)
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Project audio files
+    // Rule: Allow user to read/write their own project files.
+    // Cloud Functions will access via service account, bypassing these rules for read.
+    match /audio/{userId}/{projectId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      // Consider adding size validation if needed: request.resource.size < 50 * 1024 * 1024; // 50MB
+      // Consider adding content type validation: request.resource.contentType.matches('audio/.*');
+    }
+
+    // Allow read for any other path by default (adjust as needed for security)
+    // match /{allPaths=**} {
+    //   allow read: if true; // Example: make everything else public read - NOT RECOMMENDED for sensitive data
+    // }
+  }
+}

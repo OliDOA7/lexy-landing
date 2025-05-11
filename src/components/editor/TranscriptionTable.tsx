@@ -1,47 +1,47 @@
-
 "use client";
 
-import type { TranscriptionSegment } from "@/lib/types";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card } from "@/components/ui/card"; // Added for consistent styling
 
 interface TranscriptionTableProps {
-  segments: TranscriptionSegment[];
+  transcriptionHtml: string | null; // Expects a full HTML table string
   isLoading: boolean;
 }
 
-const TranscriptionTable = ({ segments, isLoading }: TranscriptionTableProps) => {
+const TranscriptionTable = ({ transcriptionHtml, isLoading }: TranscriptionTableProps) => {
   if (isLoading) {
-    return <div className="text-center p-4 text-muted-foreground">Loading transcription...</div>;
+    return (
+      <div className="text-center p-6 text-muted-foreground bg-card rounded-lg shadow min-h-[200px] flex items-center justify-center">
+        Loading transcription...
+      </div>
+    );
   }
 
-  if (!segments || segments.length === 0) {
-    return <div className="text-center p-4 text-muted-foreground">No transcription data available. Click "Transcribe" to generate it.</div>;
+  if (!transcriptionHtml) {
+    return (
+      <div className="text-center p-6 text-muted-foreground bg-card rounded-lg shadow min-h-[200px] flex items-center justify-center">
+        No transcription data available. Click "Transcribe" to generate it or if an error occurred, try again.
+      </div>
+    );
   }
 
+  // The HTML string should contain its own table structure (<thead>, <tbody>, etc.)
+  // Style the container, not the table itself directly here unless targeting child elements.
   return (
-    <ScrollArea className="h-[400px] w-full rounded-md border bg-card shadow">
-      <Table>
-        <TableHeader className="sticky top-0 bg-card z-10">
-          <TableRow>
-            <TableHead className="w-[100px]">Timestamp</TableHead>
-            <TableHead className="w-[150px]">Speaker</TableHead>
-            <TableHead>Text</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {segments.map((segment, index) => (
-            <TableRow key={index}>
-              <TableCell className="font-mono text-sm">{segment.timestamp}</TableCell>
-              <TableCell className="font-medium">{segment.speaker}</TableCell>
-              {/* Use dangerouslySetInnerHTML for <u> tags. Ensure 'text' is sanitized if it comes from user input, 
-                  but for AI output that we control the <u> tag usage, it's generally okay. */}
-              <TableCell dangerouslySetInnerHTML={{ __html: segment.text }} />
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </ScrollArea>
+    <Card className="shadow-md overflow-hidden">
+      <ScrollArea className="h-[400px] w-full rounded-md bg-background">
+        {/* 
+          The table styles (border, cell padding) should ideally be part of the generated HTML
+          or targeted via global CSS if consistent styling is needed for tables generated this way.
+          For example, you could add a class to the generated table: <table class="generated-transcription-table">
+          And then style .generated-transcription-table td, .generated-transcription-table th in globals.css
+        */}
+        <div 
+          className="p-4 prose dark:prose-invert max-w-none [&_table]:w-full [&_table_td]:p-2 [&_table_th]:p-2 [&_table_th]:text-left [&_table_code]:bg-muted [&_table_code]:p-1 [&_table_code]:rounded"
+          dangerouslySetInnerHTML={{ __html: transcriptionHtml }} 
+        />
+      </ScrollArea>
+    </Card>
   );
 };
 

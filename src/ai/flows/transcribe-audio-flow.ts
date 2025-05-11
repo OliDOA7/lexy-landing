@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview AI flow for transcribing audio files with specific formatting.
@@ -12,10 +11,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import type { TranscriptionSegment } from '@/lib/types'; // Re-use type from lib
 
-// Example of how an API key from .env might be accessed if using a different transcription service:
 const CUSTOM_TRANSCRIPTION_API_KEY = process.env.LEXY_TRANSCRIPTION_API_KEY;
-// A placeholder condition for when to use the custom API key. 
-// In a real application, this would be based on configuration or logic.
 const someConditionToUseCustomApi = false; 
 
 if (!CUSTOM_TRANSCRIPTION_API_KEY && someConditionToUseCustomApi) {
@@ -26,7 +22,7 @@ const TranscribeAudioInputSchema = z.object({
   audioStoragePath: z
     .string()
     .describe(
-      "The full path to the audio file. This will be used as a data URI. Expected format: 'gs://<bucket-name>/<path-to-file>' or a publicly accessible https URL if converted. This URL must be accessible by the model."
+      "The full path to the audio file. This will be used as a data URI if not a gs:// path. Expected format: 'gs://<bucket-name>/<path-to-file>' or a publicly accessible https URL or a data URI. This URL must be accessible by the model."
     ),
   languageHint: z.string().optional().describe('Optional language hint for transcription (e.g., "en-US", "es-ES"). If "auto", model will detect. This primarily guides the initial language detection if ambiguous.'),
 });
@@ -44,10 +40,9 @@ export type TranscribeAudioOutput = z.infer<typeof TranscribeAudioOutputSchema>;
 
 
 export async function transcribeAudio(input: TranscribeAudioInput): Promise<TranscribeAudioOutput> {
-  // The `audioStoragePath` must be a URL that the {{media}} helper (and underlying model) can access.
-  // For `gs://` URIs, this usually means generating a signed URL or ensuring the GCS object is publicly readable
-  // if the model plugin doesn't natively support `gs://` URIs.
-  // For this flow, we assume `audioStoragePath` is already an accessible HTTPS URL or a data URI.
+  // The `audioStoragePath` for the {{media}} helper should ideally be an accessible URL.
+  // If it's a gs:// URI, the Genkit Google AI plugin, when run in a GCP environment
+  // (like a Firebase Function) with appropriate service account permissions, should handle it.
   return transcribeAudioFlow(input);
 }
 
@@ -55,9 +50,9 @@ const transcriptionPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: { schema: TranscribeAudioInputSchema },
   output: { schema: TranscribeAudioOutputSchema },
-  model: 'googleai/gemini-1.5-flash', // Using a capable model
+  model: 'googleai/gemini-1.5-pro-latest', // Updated to Gemini 1.5 Pro
   config: {
-    temperature: 0.1, // Lower temperature for more factual and precise transcription
+    temperature: 0.1, 
      safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -65,6 +60,8 @@ const transcriptionPrompt = ai.definePrompt({
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
     ],
   },
+  // This prompt is already very detailed and asks for the JSON structure we need.
+  // The new Firebase Cloud Function will take this JSON and convert it to an HTML table.
   prompt: `You are an expert transcription service. Transcribe the provided audio file into English text and apply the following rules precisely.
 The primary language for the transcript must be English.
 
@@ -76,20 +73,20 @@ Detailed Instructions & Formatting Rules:
 1.  Diarization & Speaker Identification:
     *   Identify distinct speakers.
     *   Initial Generic Labels: Label speakers based on order of appearance (e.g., "Speaker A", "Speaker B") if no other information is available.
-    *   Name Identification: If a speaker clearly states their name (e.g., "My name is Amy," "This is Sam," "Martinez"), use their actual name as the speaker label from that point onwards (e.g., "Amy", "Sam", "Martinez").
+    *   Name Identification: If a speaker clearly states their name (e.g., "My name is Amy," "This is Sam," "Martinez"), use their actual name as the speaker label from that point onwards (e.g., "Amy", "Sam", "Martinez"). Do not include a colon.
     *   Gender Identification (If Name Unknown): If a speaker's name is not identified, but their gender can be reasonably inferred:
-        *   Label them as "UM" (Unidentified Male) or "UF" (Unidentified Female).
+        *   Label them as "UM" (Unidentified Male) or "UF" (Unidentified Female). Do not include a colon.
         *   Assign a chronological number (e.g., "UM1", "UF1", "UM2"). Use this label consistently unless their name is later identified.
-    *   Operator Messages: Label the speaker for standard automated messages common in correctional facility calls (e.g., "This call is from a federal correctional facility...", "To accept this call, press 1.") as "Operator". Transcribe these messages verbatim.
-    *   Default: If neither name nor gender can be identified, continue using generic "Speaker A", "Speaker B" labels.
-    *   Speaker Label Format: Do NOT include a colon after the speaker name in the JSON output for the 'speaker' field.
+    *   Operator Messages: Label the speaker for standard automated messages common in correctional facility calls (e.g., "This call is from a federal correctional facility...", "To accept this call, press 1.") as "Operator". Do not include a colon. Transcribe these messages verbatim.
+    *   Default: If neither name nor gender can be identified, continue using generic "Speaker A", "Speaker B" labels. Do not include a colon.
+    *   Speaker Label Format for JSON 'speaker' field: Do NOT include a colon after the speaker name.
 
 2.  Turn Consolidation & Timestamps:
     *   Group Utterances: Combine consecutive sentences or phrases spoken by the same speaker into a single continuous turn.
     *   Create New Segment: Start a new segment (a new JSON object in the output array) ONLY when:
         a.  The speaker changes.
         b.  The current speaker is interrupted (marked with //).
-        c.  There is a significant pause clearly indicating the end of a turn (speaker change is the primary trigger).
+        c.  There is a significant pause clearly indicating the end of a turn.
     *   Timestamp: Assign a single timestamp to each segment representing the start time of that consolidated speaking turn.
         *   Format: "[HH:MM:SS]" (rounded to the nearest second). Example: "[00:01:15]".
         *   Place this in the "timestamp" field of the JSON object.
@@ -113,7 +110,7 @@ Detailed Instructions & Formatting Rules:
         a.  Detect the non-English language.
         b.  Translate those non-English utterances accurately into grammatically correct English.
         c.  Include the English translation as part of the consolidated text in the "text" field.
-        d.  DO NOT include the original non-English text in the output.
+        d.  DO NOT include the original non-English text in the output JSON.
         e.  If any words were originally spoken in English *within that non-English segment*, underline those specific English words in the translated text using HTML <u> tags. Example: If "Hola, <u>John</u>, como estas?" was spoken, the output "text" should be "Hello, <u>John</u>, how are you?". If "Je vais au <u>store</u>" was spoken, it becomes "I am going to the <u>store</u>".
     *   Example "text" field entry: "Yes, I can help. I need help with this. What is the account number?" (Assuming "Necesito ayuda con esto." was spoken mid-turn by a Spanish speaker).
 
@@ -158,35 +155,20 @@ const transcribeAudioFlow = ai.defineFlow(
   async (input) => {
     console.log("Transcribing audio with input:", input);
     if (someConditionToUseCustomApi && CUSTOM_TRANSCRIPTION_API_KEY) {
-      // Placeholder for logic using the custom API key
       console.log("Using custom transcription API key:", CUSTOM_TRANSCRIPTION_API_KEY.substring(0, 10) + "..."); 
-      // This is where you would make a call to your custom transcription service.
-      // For now, it will fall through to the Google AI model if not implemented.
-      // Example:
-      // const customApiResult = await callMyCustomTranscriptionService(input.audioStoragePath, CUSTOM_TRANSCRIPTION_API_KEY);
-      // return parseCustomApiResultToSchema(customApiResult);
+      // Placeholder for custom API logic
     }
 
-    // The current flow uses Google AI, configured via the googleAI plugin by default.
     try {
-      // The model is expected to return a JSON string that parses into TranscribeAudioOutput.
-      // The definePrompt with outputSchema handles parsing the model's raw text output into JSON.
       const { output } = await transcriptionPrompt(input);
       if (!output) {
         console.error('Transcription output was null or undefined after model processing and parsing.');
         throw new Error('Transcription failed: No structured output from model.');
       }
-      // The output here should already be validated and parsed by the `ai.definePrompt` mechanism
-      // if the model returned a valid JSON string matching the schema.
-      return output; // Output is already of type TranscribeAudioOutput
+      return output; // Output is TranscriptionSegment[]
     } catch (error) {
       console.error("Error in transcribeAudioFlow:", error);
-      // Consider how to propagate errors. If it's a Zod parsing error from definePrompt,
-      // it might indicate the model didn't follow instructions.
-      // For now, rethrow.
       throw error; 
     }
   }
 );
-
-    
