@@ -6,10 +6,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import type { Project, TranscriptionSegment, UserProfile, ProjectStatus } from "@/lib/types";
 import MediaPlayer from "@/components/editor/MediaPlayer";
 import TranscriptionTable from "@/components/editor/TranscriptionTable";
-import EditorControls from "@/components/editor/EditorControls";
 import { useToast } from "@/hooks/use-toast";
 import { transcribeAudio, TranscribeAudioInput } from "@/ai/flows/transcribe-audio-flow";
-import { Loader2 } from "lucide-react";
+import { Loader2, Save, XSquare, Send, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -131,7 +130,6 @@ export default function EditorPage() {
     
     if (project.status === "Completed" || project.status === "ProcessingTranscription") {
         console.log("Auto-transcribe skipped: Project already processed or in progress.");
-        // Optionally, clear the 'new' query param if it somehow persisted and this state is reached.
         if (searchParams.get('new') === 'true') {
             router.replace(`/editor/${projectId}`, { shallow: true });
         }
@@ -199,6 +197,7 @@ export default function EditorPage() {
     setIsSaving(true);
     setErrorState({isError: false});
     try {
+      // Simulate saving transcript to Firestore. Audio is assumed to be in Storage.
       const success = await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: transcription, status: "Completed" as ProjectStatus });
       if (success) {
         setHasUnsavedChanges(false);
@@ -244,34 +243,59 @@ export default function EditorPage() {
       </div>
     );
   }
+  
+  const showTranscribeButton = project && (project.status === "Uploaded" || project.status === "ErrorTranscription") && project.storagePath;
+  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || (project.status !== 'Completed' && project.status !== 'Draft');
 
-  const canManuallyTranscribe = project.status === "Uploaded" || project.status === "Draft" || project.status === "ErrorTranscription";
 
   return (
     <div className="container mx-auto px-2 sm:px-4 py-6 md:py-8">
       <Card className="shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl md:text-3xl">{project.name}</CardTitle>
-          <CardDescription>
-            Language: {project.language} | Duration: {project.duration} min | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : 'text-blue-500'}`}>{project.status}</span>
-            {project.expiresAt && <p className="text-xs text-muted-foreground mt-1">Audio file expires: {new Date(project.expiresAt).toLocaleDateString()}</p>}
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex-grow">
+              <CardTitle className="text-2xl md:text-3xl">{project.name}</CardTitle>
+              <CardDescription>
+                Language: {project.language} | Duration: {project.duration} min | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : 'text-blue-500'}`}>{project.status}</span>
+                {project.expiresAt && <p className="text-xs text-muted-foreground mt-1">Audio file expires: {new Date(project.expiresAt).toLocaleDateString()}</p>}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 flex-shrink-0 self-start sm:self-center">
+              <Button variant="outline" onClick={handleClose} disabled={isTranscribing || isSaving}>
+                <XSquare className="mr-2 h-4 w-4" />
+                Close
+              </Button>
+              {showTranscribeButton && (
+                <Button onClick={memoizedHandleTranscribe} disabled={isTranscribing || isSaving}>
+                  {isTranscribing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Transcribe
+                </Button>
+              )}
+              <Button onClick={handleSave} disabled={disableSaveButton}>
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save
+              </Button>
+            </div>
+          </div>
+          {errorState.isError && (
+              <div className="mt-4 flex items-center text-sm text-destructive p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                  <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
+                  <span>{errorState.message || "An error occurred."}</span>
+              </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <MediaPlayer audioSrc={audioSrc} isLoading={isLoadingAudio} />
           <TranscriptionTable segments={transcription} isLoading={isTranscribing && transcription.length === 0} />
         </CardContent>
-         <EditorControls
-            onTranscribe={memoizedHandleTranscribe} // Use the memoized version for manual click too
-            onSave={handleSave}
-            onClose={handleClose}
-            isTranscribing={isTranscribing}
-            isSaving={isSaving}
-            canTranscribe={!!project.storagePath && canManuallyTranscribe && !isTranscribing}
-            hasChanges={hasUnsavedChanges}
-            isError={errorState.isError}
-            errorMessage={errorState.message}
-          />
       </Card>
     </div>
   );
