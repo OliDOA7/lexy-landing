@@ -1,3 +1,4 @@
+
 import type { Timestamp } from "firebase/firestore";
 
 export interface Plan {
@@ -25,8 +26,8 @@ export interface UserProfile {
 }
 
 export interface TranscriptionSegment {
-  timestamp: string; // Format: HH:MM:SS or MM:SS
-  speaker: string;
+  timestamp: string; // Format: [HH:MM:SS]
+  speaker: string;   // e.g., Operator, Speaker A, UM1 (no colon)
   text: string;
 }
 
@@ -67,3 +68,5 @@ export interface PlanConfig {
   storageDays: number | null;
   // Add other config details if necessary
 }
+
+    

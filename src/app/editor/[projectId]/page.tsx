@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -63,12 +64,13 @@ const mockFirebase = {
     if (!storagePath) return undefined;
     console.log(`Mock Firebase: Getting audio URL for ${storagePath}`);
     await new Promise(resolve => setTimeout(resolve, 300));
-    // Using picsum as placeholder for now. Replace with actual audio.
-    if (storagePath.includes("mock-alpha.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; 
-    if (storagePath.includes("mock-beta.wav")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
-    if (storagePath.includes("mock-gamma.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3";
-    // Fallback for dynamically created project paths
-    return `https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3`; 
+    // Using a known accessible audio file for testing the transcription flow.
+    // Replace with actual audio source logic for real uploads.
+    // This URL should be a longer, more complex audio for proper testing of the prompt.
+    // For now, using a common sample. In a real app, this would be a signed URL to the user's uploaded file.
+    return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/speech-synthesis.mp3"; // A slightly longer sample
+    // Example: if (storagePath.includes("mock-alpha.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; 
+    // return `https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3`; 
   },
   // Mock current user (replace with actual Firebase Auth)
   getCurrentUser: async (): Promise<UserProfile | null> => {
@@ -77,7 +79,6 @@ const mockFirebase = {
 };
 
 // Initialize (window as any).mockProjects as an empty array if it's not already defined.
-// DashboardPage should be the primary initializer with actual mock data.
 if (typeof window !== 'undefined' && !(window as any).mockProjects) {
     (window as any).mockProjects = []; 
 }
@@ -119,7 +120,7 @@ export default function EditorPage() {
           if (fetchedProject.storagePath) {
             setIsLoadingAudio(true);
             const url = await mockFirebase.getAudioUrl(fetchedProject.storagePath);
-            setAudioSrc(url);
+            setAudioSrc(url); // This URL will be used by MediaPlayer AND for transcription
             setIsLoadingAudio(false);
           }
         } else {
@@ -135,8 +136,12 @@ export default function EditorPage() {
   }, [projectId, toast]);
 
   const memoizedHandleTranscribe = useCallback(async () => {
-    if (!project || !project.storagePath || !currentUser) {
-      toast({ title: "Error", description: "Project data or audio path missing for transcription.", variant: "destructive" });
+    if (!project || !currentUser) { // Audio source for transcription comes from audioSrc now
+      toast({ title: "Error", description: "Project data or audio source missing for transcription.", variant: "destructive" });
+      return;
+    }
+     if (!audioSrc) { // Check if audioSrc (the URL for the model) is available
+      toast({ title: "Error", description: "Audio URL not available for transcription.", variant: "destructive" });
       return;
     }
     
@@ -150,40 +155,46 @@ export default function EditorPage() {
 
     setIsTranscribing(true);
     setErrorState({isError: false});
+    setTranscription([]); // Clear previous transcription if any
     toast({
         title: "Transcription Initiated",
-        description: `"${project.name}" is now being transcribed.`,
+        description: `"${project.name}" is now being transcribed. This may take a few minutes.`,
     });
 
     await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ProcessingTranscription" as ProjectStatus });
     setProject(prev => prev ? {...prev, status: "ProcessingTranscription" as ProjectStatus} : null);
 
     try {
-      const audioUrlForGenkit = await mockFirebase.getAudioUrl(project.storagePath);
-      if (!audioUrlForGenkit) {
-        throw new Error("Could not obtain a valid audio URL for transcription.");
-      }
+      // Ensure audioSrc is used for Genkit flow as it's the accessible URL.
       const input: TranscribeAudioInput = {
-        audioStoragePath: audioUrlForGenkit,
+        audioStoragePath: audioSrc, // Use the media-player-ready URL
         languageHint: project.language === "auto" ? undefined : project.language,
       };
-      // Simulate transcription delay
-      await new Promise(resolve => setTimeout(resolve, 3000)); 
-      const result: TranscriptionSegment[] = [
-          { timestamp: "00:00:05", speaker: "Operator", text: "This call is from a correctional facility." },
-          { timestamp: "00:00:10", speaker: "Speaker A", text: "Hello, this is a mock transcription result." },
-          { timestamp: "00:00:15", speaker: "Speaker B", text: "Okay, I understand. This is <u>mock</u> data." }
-      ];
-      // const result = await transcribeAudio(input); // Actual call
+      
+      const result = await transcribeAudio(input); // Actual call to Genkit flow
+      
       setTranscription(result);
-      setHasUnsavedChanges(true);
+      setHasUnsavedChanges(true); // Mark changes to be saved
+      
+      // Update project in mock DB with new transcript and status
       await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: result, status: "Completed" as ProjectStatus });
       setProject(prev => prev ? {...prev, transcript: result, status: "Completed" as ProjectStatus} : null);
+      
       toast({ title: "Transcription Complete", description: "Review and save your transcript." });
+
     } catch (error: any) {
       console.error("Transcription error:", error);
-      toast({ title: "Transcription Failed", description: error.message || "An error occurred during transcription.", variant: "destructive" });
-      setErrorState({isError: true, message: `Transcription Failed: ${error.message || "Unknown error"}`});
+      let errorMessage = "An error occurred during transcription.";
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      toast({ title: "Transcription Failed", description: errorMessage, variant: "destructive" });
+      setErrorState({isError: true, message: `Transcription Failed: ${errorMessage}`});
+      
+      // Update project status to ErrorTranscription in mock DB
       await mockFirebase.updateProject(projectId, currentUser.uid, { status: "ErrorTranscription" as ProjectStatus });
       setProject(prev => prev ? {...prev, status: "ErrorTranscription" as ProjectStatus} : null);
     } finally {
@@ -192,7 +203,7 @@ export default function EditorPage() {
          router.replace(`/editor/${projectId}`, { shallow: true }); // Remove ?new=true after processing
       }
     }
-  }, [project, currentUser, projectId, toast, router, searchParams]);
+  }, [project, currentUser, projectId, toast, router, searchParams, audioSrc]); // Added audioSrc dependency
 
 
   // Auto-transcription for new projects
@@ -204,13 +215,13 @@ export default function EditorPage() {
       project && 
       project.status === "Uploaded" && 
       currentUser && 
+      audioSrc && // Ensure audioSrc is loaded before attempting auto-transcription
       !isLoadingProject && 
       !isTranscribing 
     ) {
       memoizedHandleTranscribe();
-      // router.replace(`/editor/${projectId}`, { shallow: true }); // Moved to finally block of memoizedHandleTranscribe
     }
-  }, [project, currentUser, isLoadingProject, isTranscribing, searchParams, projectId, memoizedHandleTranscribe]);
+  }, [project, currentUser, isLoadingProject, isTranscribing, searchParams, projectId, memoizedHandleTranscribe, audioSrc]); // Added audioSrc
 
 
   const handleSave = async () => {
@@ -218,10 +229,12 @@ export default function EditorPage() {
     setIsSaving(true);
     setErrorState({isError: false});
     try {
-      const success = await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: transcription, status: "Completed" as ProjectStatus });
+      // Ensure the status is updated correctly, e.g., to 'Completed' or 'Draft' if user edited a completed one
+      const newStatus = project.status === "ErrorTranscription" && transcription.length > 0 ? "Completed" : project.status;
+      const success = await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: transcription, status: newStatus as ProjectStatus });
       if (success) {
         setHasUnsavedChanges(false);
-        setProject(prev => prev ? {...prev, status: "Completed" as ProjectStatus} : null); 
+        setProject(prev => prev ? {...prev, status: newStatus as ProjectStatus, transcript: transcription} : null); 
         toast({ title: "Project Saved", description: "Your transcript has been saved." });
       } else {
         throw new Error("Failed to save project to database.");
@@ -265,8 +278,8 @@ export default function EditorPage() {
     );
   }
   
-  const showTranscribeButton = project && (project.status === "Uploaded" || project.status === "ErrorTranscription") && project.storagePath;
-  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription" /* Allow saving even if transcription errored if user manually edits */) ;
+  const showTranscribeButton = project && (project.status === "Uploaded" || project.status === "ErrorTranscription") && audioSrc && !isTranscribing;
+  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription") ;
 
 
   return (
@@ -288,14 +301,16 @@ export default function EditorPage() {
               </Button>
               {showTranscribeButton && (
                 <Button onClick={memoizedHandleTranscribe} disabled={isTranscribing || isSaving || isLoadingAudio}>
-                  {isTranscribing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
+                  <Send className="mr-2 h-4 w-4" />
                   Transcribe
                 </Button>
               )}
+               {isTranscribing && (
+                <Button disabled={true}>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Transcribing...
+                </Button>
+               )}
               <Button onClick={handleSave} disabled={disableSaveButton}>
                 {isSaving ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -321,3 +336,5 @@ export default function EditorPage() {
     </div>
   );
 }
+
+    

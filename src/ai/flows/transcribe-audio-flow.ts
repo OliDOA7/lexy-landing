@@ -16,17 +16,17 @@ const TranscribeAudioInputSchema = z.object({
   audioStoragePath: z
     .string()
     .describe(
-      "The full path to the audio file in Firebase Storage. This will be used as a data URI. Expected format: 'gs://<bucket-name>/<path-to-file>' or a publicly accessible https URL if converted."
+      "The full path to the audio file. This will be used as a data URI. Expected format: 'gs://<bucket-name>/<path-to-file>' or a publicly accessible https URL if converted. This URL must be accessible by the model."
     ),
-  languageHint: z.string().optional().describe('Optional language hint for transcription (e.g., "en-US", "es-ES"). If "auto", model will detect.'),
+  languageHint: z.string().optional().describe('Optional language hint for transcription (e.g., "en-US", "es-ES"). If "auto", model will detect. This primarily guides the initial language detection if ambiguous.'),
 });
 export type TranscribeAudioInput = z.infer<typeof TranscribeAudioInputSchema>;
 
 // Output schema matches TranscriptionSegment array from lib/types.ts
 const TranscriptionSegmentSchema = z.object({
-  timestamp: z.string().describe("Timestamp of the segment start (e.g., HH:MM:SS or MM:SS)."),
-  speaker: z.string().describe("Identified speaker label (e.g., Operator, Speaker A, UM1)."),
-  text: z.string().describe("Transcribed text for the segment. HTML <u> tags may be used for underlining."),
+  timestamp: z.string().describe("Timestamp of the segment start, formatted as [HH:MM:SS] (rounded to the nearest second)."),
+  speaker: z.string().describe("Identified speaker label (e.g., Operator, Speaker A, UM1, UF1, Amy, Sam, Martinez). Do not include a colon after the speaker name."),
+  text: z.string().describe("Transcribed text for the segment. English translation for non-English parts. HTML <u> tags for originally English words in non-English segments. Interruptions end with //."),
 });
 
 const TranscribeAudioOutputSchema = z.array(TranscriptionSegmentSchema);
@@ -34,18 +34,10 @@ export type TranscribeAudioOutput = z.infer<typeof TranscribeAudioOutputSchema>;
 
 
 export async function transcribeAudio(input: TranscribeAudioInput): Promise<TranscribeAudioOutput> {
-  // In a real scenario, if audioStoragePath is a gs:// URI, you might need a step here
-  // to generate a signed URL or otherwise make it accessible to the model if it can't directly access GCS.
-  // For this example, we assume the model can handle a GCS path or it's converted to a data URI elsewhere.
-  // For simplicity, we'll pass it directly to the prompt, assuming the {{media}} helper or model handles it.
-  // However, Genkit's {{media url=...}} typically expects an HTTP(S) URL or a data URI.
-  // A gs:// URI might not work directly unless the underlying model plugin specifically supports it.
-  // A more robust solution would be to get a downloadable HTTPS URL for the GCS object.
-
-  // For now, we'll assume `input.audioStoragePath` is a format `{{media}}` can handle (e.g. HTTPS URL or data URI).
-  // If it's a gs:// path, this will likely fail unless the `googleAI` plugin is configured to handle it.
-  // The prompt assumes `audioStoragePath` IS usable by `{{media}}`.
-
+  // The `audioStoragePath` must be a URL that the {{media}} helper (and underlying model) can access.
+  // For `gs://` URIs, this usually means generating a signed URL or ensuring the GCS object is publicly readable
+  // if the model plugin doesn't natively support `gs://` URIs.
+  // For this flow, we assume `audioStoragePath` is already an accessible HTTPS URL or a data URI.
   return transcribeAudioFlow(input);
 }
 
@@ -55,60 +47,95 @@ const transcriptionPrompt = ai.definePrompt({
   output: { schema: TranscribeAudioOutputSchema },
   model: 'googleai/gemini-1.5-flash', // Using a capable model
   config: {
-    temperature: 0.2, // Lower temperature for more factual transcription
-     safetySettings: [ // Adjust safety settings if needed for transcription content
+    temperature: 0.1, // Lower temperature for more factual and precise transcription
+     safetySettings: [
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
     ],
   },
-  prompt: `You are an expert transcription service. Transcribe the provided audio file and apply the following rules precisely:
+  prompt: `You are an expert transcription service. Transcribe the provided audio file into English text and apply the following rules precisely.
+The primary language for the transcript must be English.
 
 Audio File: {{media url=audioStoragePath}}
-{{#if languageHint}}Language Hint: {{languageHint}}{{/if}}
+{{#if languageHint}}Initial Language Hint: {{languageHint}}{{/if}}
 
-Formatting Rules:
-1.  Speaker Identification:
-    *   Identify distinct speakers. Label them as "Operator", "Speaker A", "Speaker B", etc.
-    *   If gender can be reliably determined for unknown speakers, use "UM1" (Unknown Male 1), "UF1" (Unknown Female 1), "UM2", etc.
-    *   If specific names are clearly spoken and identifiable as speaker labels (e.g., "John said..."), use those names. Otherwise, stick to generic labels.
-2.  Turn Grouping: Combine consecutive utterances from the same speaker into a single transcription segment. A new segment (new row in the output JSON) should only occur upon a clear speaker change or a significant interruption that changes the conversational turn.
-3.  Timestamps: Provide a timestamp for the beginning of each spoken segment in "HH:MM:SS" or "MM:SS" format.
-4.  Interruptions: If a speaker is clearly cut off mid-sentence or mid-word by another speaker or an event, end their transcribed text with "//". Example: "I was going to say that-- //"
-5.  Unintelligible Segments:
-    *   If a short segment of speech is unintelligible or unclear due to mumbling, background noise, or crosstalk, represent it as "[UI - Mumbles]", "[UI - Background Noise]", "[UI - Crosstalk]", or a similar concise description of the reason. Example: "I went to the [UI - Mumbles] yesterday."
-    *   If an entire speaker's turn is unintelligible, use a single segment like: { "timestamp": "00:XX:YY", "speaker": "Speaker A", "text": "[UI - Entire segment unintelligible]" }.
-6.  Non-English Translation & Underlining:
-    *   If a segment of speech is predominantly in a non-English language:
-        a.  Identify the language if possible (e.g., Spanish, French).
-        b.  Translate the entire non-English phrase or sentence accurately into English.
-        c.  In the translated English text, if any words were originally spoken in English *within that non-English segment*, underline those specific English words using HTML <u> tags. Example: If "Hola, <u>John</u>, como estas?" was spoken, the output text should be "Hello, <u>John</u>, how are you?". If "Je vais au <u>store</u>" was spoken, it becomes "I am going to the <u>store</u>".
-    *   If an entire turn is non-English, translate the whole turn.
-7.  Operator Messages:
-    *   Listen for standard automated messages common in correctional facility calls (e.g., "This call is from a federal correctional facility and is subject to monitoring and recording.", "You have a call from an inmate at...", "To accept this call, press 1.").
-    *   Transcribe these messages verbatim.
-    *   Label the speaker for these messages as "Operator".
-8.  Non-speech Sounds (Use sparingly and only if very clear and relevant):
-    *   Represent significant, clearly identifiable non-speech sounds relevant to the conversation context with bracketed descriptions like "[Laughs]", "[Coughs]", "[Door Slam]", "[Music]", "[Silence X seconds]". Example: "And then he just [Laughs] and walked away."
+Detailed Instructions & Formatting Rules:
+
+1.  Diarization & Speaker Identification:
+    *   Identify distinct speakers.
+    *   Initial Generic Labels: Label speakers based on order of appearance (e.g., "Speaker A", "Speaker B") if no other information is available.
+    *   Name Identification: If a speaker clearly states their name (e.g., "My name is Amy," "This is Sam," "Martinez"), use their actual name as the speaker label from that point onwards (e.g., "Amy", "Sam", "Martinez").
+    *   Gender Identification (If Name Unknown): If a speaker's name is not identified, but their gender can be reasonably inferred:
+        *   Label them as "UM" (Unidentified Male) or "UF" (Unidentified Female).
+        *   Assign a chronological number (e.g., "UM1", "UF1", "UM2"). Use this label consistently unless their name is later identified.
+    *   Operator Messages: Label the speaker for standard automated messages common in correctional facility calls (e.g., "This call is from a federal correctional facility...", "To accept this call, press 1.") as "Operator". Transcribe these messages verbatim.
+    *   Default: If neither name nor gender can be identified, continue using generic "Speaker A", "Speaker B" labels.
+    *   Speaker Label Format: Do NOT include a colon after the speaker name in the JSON output for the 'speaker' field.
+
+2.  Turn Consolidation & Timestamps:
+    *   Group Utterances: Combine consecutive sentences or phrases spoken by the same speaker into a single continuous turn.
+    *   Create New Segment: Start a new segment (a new JSON object in the output array) ONLY when:
+        a.  The speaker changes.
+        b.  The current speaker is interrupted (marked with //).
+        c.  There is a significant pause clearly indicating the end of a turn (speaker change is the primary trigger).
+    *   Timestamp: Assign a single timestamp to each segment representing the start time of that consolidated speaking turn.
+        *   Format: "[HH:MM:SS]" (rounded to the nearest second). Example: "[00:01:15]".
+        *   Place this in the "timestamp" field of the JSON object.
+
+3.  Transcription Content:
+    *   Transcribe spoken words verbatim for the entire consolidated turn.
+    *   Use standard English punctuation and capitalization.
+    *   Place the full text of the turn in the "text" field of the JSON object.
+
+4.  Handling Interruptions:
+    *   If a speaker's consolidated turn is cut off mid-sentence or mid-word by another speaker or an event, end their transcribed text in the "text" field with "//". This also signals the end of their segment. Example: "I was trying to explain the whole process, but then//"
+
+5.  Handling Unintelligible Audio:
+    *   If parts of the audio within a speaker's turn are unclear or unintelligible, use the notation "[UI - <Reason>]" within the "text" field.
+    *   Specify the reason concisely: "[UI - Bad audio]", "[UI - Background noise]", "[UI - Mumbles]", "[UI - Crosstalk]", or simply "[UI]" if the reason is unknown.
+    *   Example "text" field entry: "Okay, I have the first part, but the second part was [UI - Bad audio], can you repeat that?"
+
+6.  Language Translation (Non-English to English):
+    *   The primary language for the transcript MUST be English.
+    *   If a speaker uses a language other than English during their turn:
+        a.  Detect the non-English language.
+        b.  Translate those non-English utterances accurately into grammatically correct English.
+        c.  Include the English translation as part of the consolidated text in the "text" field.
+        d.  DO NOT include the original non-English text in the output.
+        e.  If any words were originally spoken in English *within that non-English segment*, underline those specific English words in the translated text using HTML <u> tags. Example: If "Hola, <u>John</u>, como estas?" was spoken, the output "text" should be "Hello, <u>John</u>, how are you?". If "Je vais au <u>store</u>" was spoken, it becomes "I am going to the <u>store</u>".
+    *   Example "text" field entry: "Yes, I can help. I need help with this. What is the account number?" (Assuming "Necesito ayuda con esto." was spoken mid-turn by a Spanish speaker).
+
+7.  Non-Speech Sounds (Optional but Recommended):
+    *   Include significant, clearly identifiable non-speech sounds relevant to the conversation context with bracketed descriptions within the "text" field.
+    *   Examples: "[Laughs]", "[Coughs]", "[Phone rings]", "[Door Slam]", "[Silence X seconds]".
+    *   Example "text" field entry: "And then he just [Laughs] and walked away."
 
 Output Format:
-Return the transcription as a JSON array of objects. Each object in the array must conform to the following structure:
+Return the transcription as a VALID JSON ARRAY of objects. Each object in the array MUST conform to the following structure:
 {
-  "timestamp": "string (HH:MM:SS or MM:SS format)",
-  "speaker": "string (e.g., Operator, Speaker A, UM1)",
-  "text": "string (transcribed text, potentially with <u> tags for rule #6)"
+  "timestamp": "[HH:MM:SS]",
+  "speaker": "string (e.g., Operator, Speaker A, UM1, UF1, Amy, Sam, Martinez - no colon)",
+  "text": "string (transcribed English text, potentially with <u> tags and // or [UI] markers)"
 }
 
-Example of expected JSON output:
+Example of expected JSON output structure:
 [
-  { "timestamp": "00:00:05", "speaker": "Operator", "text": "This call is from a federal prison and may be recorded and monitored." },
-  { "timestamp": "00:00:15", "speaker": "Speaker A", "text": "Hello, how are you? I heard vous allez <u>bien</u> today." },
-  { "timestamp": "00:00:20", "speaker": "Speaker B", "text": "I'm doing well, thanks for //" },
-  { "timestamp": "00:00:22", "speaker": "Speaker A", "text": "Great! I wanted to ask about the [UI - Mumbles] situation." }
+  { "timestamp": "[00:00:00]", "speaker": "UF1", "text": "Hello?" },
+  { "timestamp": "[00:00:02]", "speaker": "Operator", "text": "You have a prepaid call. You will not be charged for this call. This call is from//" },
+  { "timestamp": "[00:00:06]", "speaker": "Martinez", "text": "[UI - Mumbles] Martinez." },
+  { "timestamp": "[00:00:08]", "speaker": "Operator", "text": "An inmate at a federal prison. This call may be heard or recorded. Hang up to decline the call or to accept dial 5 now. If you wish to block any future calls//" },
+  { "timestamp": "[00:00:15]", "speaker": "Martinez", "text": "Hi! How are you? Here everything is very good, calm down. Happy thanks giving! [Laughs]." },
+  { "timestamp": "[00:00:17]", "speaker": "UF1", "text": "Good, son. And you? Happy thanks giving!" },
+  { "timestamp": "[00:00:28]", "speaker": "Amy", "text": "Okay, Sam, let's get that order started. What can I get for you?" },
+  { "timestamp": "[00:00:31]", "speaker": "Sam", "text": "Great, I'd like one large cheese pizza." },
+  { "timestamp": "[00:00:34]", "speaker": "UM1", "text": "Did you remember to add the [UI - Bad audio]? Because last time//" },
+  { "timestamp": "[00:00:37]", "speaker": "Amy", "text": "Yes, it was added. Don't worry." }
 ]
 
-Ensure the entire output is a valid JSON array.
+Ensure the entire output is a single, valid JSON array. Do not include any explanatory text before or after the JSON array itself.
+Adhere strictly to all formatting rules, especially turn consolidation, speaker labeling, and timestamp format.
 `,
 });
 
@@ -121,21 +148,24 @@ const transcribeAudioFlow = ai.defineFlow(
   async (input) => {
     console.log("Transcribing audio with input:", input);
     try {
+      // The model is expected to return a JSON string that parses into TranscribeAudioOutput.
+      // The definePrompt with outputSchema handles parsing the model's raw text output into JSON.
       const { output } = await transcriptionPrompt(input);
       if (!output) {
-        console.error('Transcription output was null or undefined.');
-        // Consider throwing a more specific error or returning a default error structure
-        throw new Error('Transcription failed: No output from model.');
+        console.error('Transcription output was null or undefined after model processing and parsing.');
+        throw new Error('Transcription failed: No structured output from model.');
       }
-      // Validate the output against the schema again, if necessary, or trust definePrompt's validation.
-      // Zod parse will throw if it doesn't match.
-      return TranscribeAudioOutputSchema.parse(output);
+      // The output here should already be validated and parsed by the `ai.definePrompt` mechanism
+      // if the model returned a valid JSON string matching the schema.
+      return output; // Output is already of type TranscribeAudioOutput
     } catch (error) {
       console.error("Error in transcribeAudioFlow:", error);
-      // Rethrow or handle; for now, rethrowing.
-      // Potentially, return a structured error within TranscribeAudioOutput if the schema allows.
-      // For now, let the error propagate.
+      // Consider how to propagate errors. If it's a Zod parsing error from definePrompt,
+      // it might indicate the model didn't follow instructions.
+      // For now, rethrow.
       throw error; 
     }
   }
 );
+
+    
