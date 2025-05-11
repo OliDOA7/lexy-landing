@@ -65,12 +65,9 @@ const mockFirebase = {
     console.log(`Mock Firebase: Getting audio URL for ${storagePath}`);
     await new Promise(resolve => setTimeout(resolve, 300));
     // Using a known accessible audio file for testing the transcription flow.
-    // Replace with actual audio source logic for real uploads.
     // This URL should be a longer, more complex audio for proper testing of the prompt.
     // For now, using a common sample. In a real app, this would be a signed URL to the user's uploaded file.
-    return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/speech-synthesis.mp3"; // A slightly longer sample
-    // Example: if (storagePath.includes("mock-alpha.mp3")) return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; 
-    // return `https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3`; 
+    return "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"; // A reliable short audio sample
   },
   // Mock current user (replace with actual Firebase Auth)
   getCurrentUser: async (): Promise<UserProfile | null> => {
