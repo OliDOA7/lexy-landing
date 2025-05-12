@@ -13,9 +13,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; 
 
-// Replace with your actual deployed Firebase Cloud Function URL
-// For local development, this would be like: 'http://127.0.0.1:5001/lexy-s8xiw/us-central1/transcribeAudioHttp'
-const TRANSCRIPTION_FUNCTION_URL = process.env.NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL || "YOUR_CLOUD_FUNCTION_URL_HERE/transcribeAudioHttp";
+// Standardized placeholder. User must replace this in .env.local
+const PLACEHOLDER_FUNCTION_URL_SUBSTRING = "PASTE_YOUR_FUNCTION_URL_HERE";
+
+// The .env.local file should define NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL
+// Fallback to a placeholder if not defined, which will be caught by checks.
+const TRANSCRIPTION_FUNCTION_URL = process.env.NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL || `${PLACEHOLDER_FUNCTION_URL_SUBSTRING}/transcribeAudioHttp`;
 
 
 const mockFirebase = {
@@ -30,7 +33,6 @@ const mockFirebase = {
           ...projectFromGlobalStore,
           createdAt: new Date(projectFromGlobalStore.createdAt),
           expiresAt: projectFromGlobalStore.expiresAt ? new Date(projectFromGlobalStore.expiresAt) : undefined,
-          // Ensure transcript is correctly typed (string for HTML, or specific structure if parsed)
           transcript: projectFromGlobalStore.transcript, 
         };
       }
@@ -65,10 +67,8 @@ const mockFirebase = {
     if (!storagePath) return { playerSrc: undefined, gsPath: undefined };
     console.log(`Mock Firebase: Getting audio URL for ${storagePath}`);
     await new Promise(resolve => setTimeout(resolve, 100));
-    // In a real app, playerSrc would be a signed URL from the gsPath.
-    // For mock, if it's a gsPath, use a placeholder. If it's already HTTPS, use it.
     const playerSrc = storagePath.startsWith("gs://") 
-      ? `https://storage.googleapis.com/${storagePath.substring(5)}` // Basic mock conversion
+      ? `https://storage.googleapis.com/${storagePath.substring(5)}` 
       : storagePath; 
     return { playerSrc, gsPath: storagePath.startsWith("gs://") ? storagePath : undefined };
   },
@@ -132,7 +132,12 @@ export default function EditorPage() {
           setEditableProjectName(fetchedProject.name);
           if (typeof fetchedProject.transcript === 'string') {
             setTranscriptionHtml(fetchedProject.transcript);
-          } else {
+          } else if (Array.isArray(fetchedProject.transcript)) {
+            // If transcript is an array of segments, it needs to be converted to HTML table here or by a utility
+            // For now, assuming it's string or null
+             setTranscriptionHtml(null); // Or convert to HTML table
+          }
+           else {
             setTranscriptionHtml(null); 
           }
           
@@ -175,10 +180,13 @@ export default function EditorPage() {
             setAudioDurationDisplay("Error reading duration");
             URL.revokeObjectURL(audio.src);
         }
-    } else {
+    } else if (project?.duration) {
+        setAudioDurationDisplay(`${project.duration} min`);
+    }
+     else {
         setAudioDurationDisplay("N/A");
     }
-  }, [selectedFileForUpload]);
+  }, [selectedFileForUpload, project]);
 
 
   const callTranscriptionService = useCallback(async (
@@ -205,9 +213,10 @@ export default function EditorPage() {
     }
   
     try {
-      if (TRANSCRIPTION_FUNCTION_URL.includes("YOUR_CLOUD_FUNCTION_URL_HERE") || TRANSCRIPTION_FUNCTION_URL.includes("PASTE_YOUR_FUNCTION_URL_HERE")) {
-        console.error("Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env.local file.");
-        throw new Error("Transcription service URL is not configured correctly. Please check your .env.local file and ensure the URL points to your deployed or emulated Firebase Function.");
+      if (TRANSCRIPTION_FUNCTION_URL.includes(PLACEHOLDER_FUNCTION_URL_SUBSTRING)) {
+        const errorMsg = `Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env.local file, replacing the placeholder: ${PLACEHOLDER_FUNCTION_URL_SUBSTRING}.`;
+        console.error(errorMsg);
+        throw new Error("Transcription service URL is not configured correctly. Check your .env.local file (created from .env.example) and ensure the placeholder URL is replaced with your actual deployed or emulated Firebase Function URL.");
       }
   
       const response = await fetch(TRANSCRIPTION_FUNCTION_URL, {
@@ -249,7 +258,7 @@ export default function EditorPage() {
         title: "Transcription Failed", 
         description: `${errorMessage} Please ensure your Cloud Function is deployed and configured correctly. Check browser and Cloud Function logs for more details.`, 
         variant: "destructive",
-        duration: 10000, // Longer duration for error messages
+        duration: 10000,
       });
       setErrorState({ isError: true, message: `Transcription Failed: ${errorMessage}` });
       
@@ -281,6 +290,12 @@ export default function EditorPage() {
 
     let audioDataUri;
     try {
+      // For Genkit, we need to pass an accessible URL or a gs:// path.
+      // If file is uploaded client-side and not yet in GCS, data URI is an option for some models/setups,
+      // but it's better to upload to GCS first and pass the gs:// path.
+      // The current Genkit flow expects `audioStoragePath` to be a GCS path or accessible URL.
+      // For this mock flow, we will simulate upload and use a data URI.
+      // IN A REAL APP: Upload to Firebase Storage first, then pass the `gs://<bucket>/<path>`
       audioDataUri = await fileToDataUri(selectedFileForUpload);
     } catch (error) {
       console.error("Error converting file to Data URI:", error);
@@ -289,6 +304,7 @@ export default function EditorPage() {
       return;
     }
     
+    // Mock GCS path. In real app, this path would come from successful Firebase Storage upload.
     const gsStoragePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${currentUser.uid}/${projectId}/${selectedFileForUpload.name}`;
     
     const audio = document.createElement('audio');
@@ -328,12 +344,18 @@ export default function EditorPage() {
     const updatedProjectForDb = { ...project, ...projectUpdates };
     setProject(updatedProjectForDb); 
     
+    // Simulate getting a playable URL (in real app, this would be a signed URL or public GCS URL)
     const { playerSrc } = await mockFirebase.getAudioUrl(gsStoragePath);
     setMediaPlayerSrc(playerSrc);
 
+    // IMPORTANT: Pass the `audioDataUri` if your function expects that for direct processing,
+    // OR pass `gsStoragePath` if your function will fetch from GCS.
+    // The Genkit flow `transcribe-audio-flow.ts` expects `audioStoragePath` as a URL or `gs://` path.
+    // For the mock `fileToDataUri` used here, we are passing the data URI.
+    // Change to `gsStoragePath` if your Cloud Function is set up to read from GCS directly.
     await callTranscriptionService(
       { name: updatedProjectForDb.name, language: updatedProjectForDb.language },
-      audioDataUri 
+      audioDataUri // Or gsStoragePath, depending on function setup
     );
 
     setShowInitialNewProjectUI(false);
@@ -405,7 +427,7 @@ export default function EditorPage() {
     );
   }
 
-  if (!project) {
+  if (!project && !isLoadingProject) { // Ensure not to show this while project is loading
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <AlertTriangle className="h-16 w-16 text-destructive mx-auto mb-4" />
@@ -416,6 +438,9 @@ export default function EditorPage() {
     );
   }
   
+  // Ensure project is not null before trying to access its properties
+  if (!project) return null; // Or a more specific loading/error state if it reaches here unexpectedly
+
   const showManualTranscribeButton = project && 
     (project.status === "Uploaded" || project.status === "ErrorTranscription" || project.status === "Draft") && 
     project.storagePath && !isTranscribing && !showInitialNewProjectUI;
@@ -440,7 +465,7 @@ export default function EditorPage() {
                   disabled={isTranscribing || isSaving}
                 />
               <CardDescription>
-                Language: {project.language} | Duration: {project.duration > 0 ? `${project.duration} min` : audioDurationDisplay !== 'N/A' ? audioDurationDisplay : 'N/A'} | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : project.status === 'ProcessingTranscription' ? 'text-blue-500 animate-pulse' : 'text-blue-500'}`}>{project.status}</span>
+                Language: {project.language} | Duration: {audioDurationDisplay} | Status: <span className={`font-semibold ${project.status === 'Completed' ? 'text-green-500' : project.status.startsWith('Error') ? 'text-destructive' : project.status === 'ProcessingTranscription' ? 'text-blue-500 animate-pulse' : 'text-blue-500'}`}>{project.status}</span>
                 {project.expiresAt && <p className="text-xs text-muted-foreground mt-1">Audio file expires: {new Date(project.expiresAt).toLocaleDateString()}</p>}
               </CardDescription>
             </div>
@@ -451,13 +476,15 @@ export default function EditorPage() {
               </Button>
               {showManualTranscribeButton && (
                 <Button onClick={() => {
-                  if (project.storagePath) { 
+                  // For re-transcription, we need an accessible URL or gs:// path.
+                  // The Genkit flow expects `audioStoragePath` to be this.
+                  if (project.storagePath) { // Assuming storagePath is gs:// or an accessible https URL
                      callTranscriptionService(
                         { name: editableProjectName, language: project.language },
                         project.storagePath 
                      );
                   } else {
-                    toast({ title: "Error", description: "Audio file not found for re-transcription.", variant: "destructive"});
+                    toast({ title: "Error", description: "Audio file path not found for re-transcription.", variant: "destructive"});
                   }
                 }} disabled={isTranscribing || isSaving || isLoadingAudio}>
                   <Send className="mr-2 h-4 w-4" />

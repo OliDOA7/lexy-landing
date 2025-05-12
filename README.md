@@ -22,38 +22,46 @@ This project uses environment variables for configuration. You'll need to set th
     ```bash
     cp .env.example .env.local
     ```
+    If `.env.example` does not exist, create `.env.local` manually.
 
-2.  **Configure `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL`:**
-    Open your new `.env.local` file. You **must** update the `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL` variable. This URL points to your Firebase Cloud Function responsible for audio transcription.
+2.  **Configure `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL` (Required):**
+    Open your `.env.local` file. You **must** update the `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL` variable. This URL points to your Firebase Cloud Function responsible for audio transcription.
+
+    The placeholder in `.env.example` (and the code's fallback) is:
+    `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL="PASTE_YOUR_FUNCTION_URL_HERE/transcribeAudioHttp"`
+
+    You need to replace `"PASTE_YOUR_FUNCTION_URL_HERE/transcribeAudioHttp"` with the actual URL of your deployed or emulated `transcribeAudioHttp` function.
 
     *   **If you have deployed your `transcribeAudioHttp` function to Firebase:**
         The URL will look something like:
         `https://<YOUR_REGION>-<YOUR_PROJECT_ID>.cloudfunctions.net/transcribeAudioHttp`
         Replace `<YOUR_REGION>` (e.g., `us-central1`) and `<YOUR_PROJECT_ID>` with your actual Firebase project details.
+        Example: `https://us-central1-my-lexy-project.cloudfunctions.net/transcribeAudioHttp`
 
     *   **If you are running the Firebase emulator locally:**
         The URL will look something like:
         `http://127.0.0.1:5001/<YOUR_PROJECT_ID>/<YOUR_REGION>/transcribeAudioHttp`
         (Commonly `http://127.0.0.1:5001/your-project-id/us-central1/transcribeAudioHttp` if emulating in `us-central1`).
+        Example: `http://127.0.0.1:5001/my-lexy-project/us-central1/transcribeAudioHttp`
 
-    Update the line in `.env.local`:
+    **Update the line in `.env.local`:**
     ```env
-    NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL="YOUR_ACTUAL_FIREBASE_FUNCTION_URL_HERE"
+    NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL="YOUR_ACTUAL_FIREBASE_FUNCTION_URL_GOES_HERE"
     ```
-    Replace `"YOUR_ACTUAL_FIREBASE_FUNCTION_URL_HERE"` with the correct URL.
+    Replace `"YOUR_ACTUAL_FIREBASE_FUNCTION_URL_GOES_HERE"` with the correct URL from above.
 
 3.  **Configure Google AI API Key (for Genkit):**
     If you are not using Application Default Credentials (ADC) (e.g., when running locally without gcloud auth or outside a GCP environment), you need to provide a `GOOGLE_API_KEY`.
-    Add this to your `.env.local` file:
+    Add this to your `.env.local` file (see `.env.example` for the key name):
     ```env
     GOOGLE_API_KEY="YOUR_GOOGLE_AI_STUDIO_API_KEY"
     ```
-    *Note: When deploying to Firebase Functions, ADC is often configured, and this key might not be needed directly in `.env.local` for the server-side functions environment.*
+    *Note: When deploying to Firebase Functions, ADC is often configured, and this key might not be needed directly in `.env.local` for the server-side functions environment, but it's good practice to have it for local Genkit development.*
 
 4.  **Other Firebase Configuration (Optional):**
-    If you are using Firebase client-side features (like Auth, Firestore directly from client), you might need to populate other `NEXT_PUBLIC_FIREBASE_*` variables in `.env.local` based on your Firebase project settings.
+    If you are using Firebase client-side features (like Auth, Firestore directly from client), you might need to populate other `NEXT_PUBLIC_FIREBASE_*` variables in `.env.local` based on your Firebase project settings. Refer to `.env.example` for these variable names.
 
-**Important:** `.env.local` is gitignored by default and should not be committed to your repository as it may contain sensitive keys.
+**Important:** `.env.local` is gitignored by default and should not be committed to your repository as it may contain sensitive keys. Ensure it exists and is correctly configured.
 
 ### Install Dependencies
 
@@ -80,7 +88,7 @@ This usually runs on `http://localhost:9002`.
 
 To test Firebase Functions locally, including the `transcribeAudioHttp` function:
 
-1.  Ensure you have the Firebase Emulators set up.
+1.  Ensure you have the Firebase Emulators set up (`firebase init emulators`).
 2.  Build your Cloud Functions TypeScript code:
     ```bash
     cd functions
@@ -91,7 +99,7 @@ To test Firebase Functions locally, including the `transcribeAudioHttp` function
     ```bash
     firebase emulators:start --only functions,storage,firestore # Add other services if needed
     ```
-    The Functions emulator typically serves HTTP functions at `http://127.0.0.1:5001`.
+    The Functions emulator typically serves HTTP functions at `http://127.0.0.1:5001`. Make sure your `NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL` in `.env.local` reflects this emulator URL during local development.
 
 ### Running Genkit Development Server (Optional)
 
@@ -145,5 +153,7 @@ Ensure your `firebase.json` is configured to serve the Next.js static export (fr
     *   `functions/src/index.ts`: Main Cloud Functions file.
 *   `public/`: Static assets.
 *   `lib/`: Utility functions, types, and configurations.
+*   `.env.local`: Local environment variables (create from `.env.example`).
+*   `.env.example`: Example environment variables.
 
-Ensure environment variables are correctly set up in your Firebase project settings for deployed functions (e.g., `GOOGLE_API_KEY` if needed).
+Ensure environment variables are correctly set up in your Firebase project settings for deployed functions (e.g., `GOOGLE_API_KEY` if needed and not using ADC).
