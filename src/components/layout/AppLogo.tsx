@@ -25,8 +25,8 @@ const AppLogo = () => {
   return (
     <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
       <svg
-        width={350} 
-        height={500}
+        width={250} 
+        height={250}
         viewBox={`0 0 ${svgViewBoxWidth} ${svgViewBoxHeight}`} // Internal coordinate system
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
