@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Changed from Geist
+import { Inter } from 'next/font/google'; // Ensure Inter is used
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
-const inter = Inter({ // Changed from geistSans
-  variable: '--font-sans', // Changed from --font-geist-sans
+const inter = Inter({ 
+  variable: '--font-sans', // Ensure this uses --font-sans
   subsets: ['latin'],
 });
 
