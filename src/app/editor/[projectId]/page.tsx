@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import type { Project, UserProfile, ProjectStatus } from "@/lib/types";
+import type { Project, UserProfile, ProjectStatus, TranscriptionRow } from "@/lib/types";
 import MediaPlayer from "@/components/editor/MediaPlayer";
 import TranscriptionTable from "@/components/editor/TranscriptionTable";
 import NewProjectInitialSetup from "@/components/editor/NewProjectInitialSetup";
@@ -13,11 +13,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; 
 
-// Standardized placeholder. User must replace this in .env.local
 const PLACEHOLDER_FUNCTION_URL_SUBSTRING = "PASTE_YOUR_FUNCTION_URL_HERE";
+const LEGACY_PLACEHOLDER_FUNCTION_URL_SUBSTRING = "YOUR_CLOUD_FUNCTION_URL_HERE";
 
-// The .env.local file should define NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL
-// Fallback to a placeholder if not defined, which will be caught by checks.
+
 const TRANSCRIPTION_FUNCTION_URL = process.env.NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL || `${PLACEHOLDER_FUNCTION_URL_SUBSTRING}/transcribeAudioHttp`;
 
 
@@ -29,11 +28,20 @@ const mockFirebase = {
     if (typeof window !== 'undefined' && (window as any).mockProjects) {
       const projectFromGlobalStore = (window as any).mockProjects.find((p: any) => p.id === projectId && p.ownerId === userId);
       if (projectFromGlobalStore) {
+        // Ensure transcript is an array of TranscriptionRow or undefined
+        let transcriptData = projectFromGlobalStore.transcript;
+        if (typeof transcriptData === 'string') { 
+            // This case should ideally not happen if we consistently store arrays
+            console.warn("Project transcript was a string, expected array. Clearing for safety.");
+            transcriptData = undefined; 
+        }
+
         return {
           ...projectFromGlobalStore,
           createdAt: new Date(projectFromGlobalStore.createdAt),
           expiresAt: projectFromGlobalStore.expiresAt ? new Date(projectFromGlobalStore.expiresAt) : undefined,
-          transcript: projectFromGlobalStore.transcript, 
+          transcript: transcriptData, 
+          detectedLanguages: projectFromGlobalStore.detectedLanguages || [],
         };
       }
     }
@@ -53,6 +61,10 @@ const mockFirebase = {
             if (updates.expiresAt instanceof Date) {
               updatesForGlobalStore.expiresAt = updates.expiresAt.toISOString();
             }
+            // Ensure transcript is stored correctly
+            if (updates.transcript && Array.isArray(updates.transcript)) {
+                updatesForGlobalStore.transcript = updates.transcript;
+            }
             
             (window as any).mockProjects[projectIndex] = { 
               ...(window as any).mockProjects[projectIndex], 
@@ -68,7 +80,7 @@ const mockFirebase = {
     console.log(`Mock Firebase: Getting audio URL for ${storagePath}`);
     await new Promise(resolve => setTimeout(resolve, 100));
     const playerSrc = storagePath.startsWith("gs://") 
-      ? `https://storage.googleapis.com/${storagePath.substring(5)}` 
+      ? `https://storage.googleapis.com/${storagePath.substring(5)}` // Basic conversion for mock
       : storagePath; 
     return { playerSrc, gsPath: storagePath.startsWith("gs://") ? storagePath : undefined };
   },
@@ -103,7 +115,7 @@ export default function EditorPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [mediaPlayerSrc, setMediaPlayerSrc] = useState<string | undefined>(undefined);
-  const [transcriptionHtml, setTranscriptionHtml] = useState<string | null>(null);
+  const [transcriptionData, setTranscriptionData] = useState<TranscriptionRow[] | null>(null); // Stores array of TranscriptionRow
   
   const [isLoadingProject, setIsLoadingProject] = useState(true);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
@@ -130,15 +142,13 @@ export default function EditorPage() {
         if (fetchedProject) {
           setProject(fetchedProject);
           setEditableProjectName(fetchedProject.name);
-          if (typeof fetchedProject.transcript === 'string') {
-            setTranscriptionHtml(fetchedProject.transcript);
-          } else if (Array.isArray(fetchedProject.transcript)) {
-            // If transcript is an array of segments, it needs to be converted to HTML table here or by a utility
-            // For now, assuming it's string or null
-             setTranscriptionHtml(null); // Or convert to HTML table
-          }
-           else {
-            setTranscriptionHtml(null); 
+          
+          // Set transcriptionData from fetchedProject.transcript (should be TranscriptionRow[])
+          if (Array.isArray(fetchedProject.transcript)) {
+            setTranscriptionData(fetchedProject.transcript);
+          } else {
+            // Handle case where transcript might be old string format or null
+            setTranscriptionData(null); 
           }
           
           const isNewProjectFlow = searchParams.get('new') === 'true';
@@ -151,7 +161,7 @@ export default function EditorPage() {
             setMediaPlayerSrc(playerSrc);
             setIsLoadingAudio(false);
           } else {
-             setShowInitialNewProjectUI(false);
+             setShowInitialNewProjectUI(false); // Existing project but no audio yet, or error
           }
         } else {
           toast({ title: "Error", description: "Project not found or access denied.", variant: "destructive" });
@@ -181,7 +191,11 @@ export default function EditorPage() {
             URL.revokeObjectURL(audio.src);
         }
     } else if (project?.duration) {
-        setAudioDurationDisplay(`${project.duration} min`);
+        // Format duration from minutes to "Xm Ys" if needed, or just display minutes
+        const totalSeconds = project.duration * 60;
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+        setAudioDurationDisplay(seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes} min`);
     }
      else {
         setAudioDurationDisplay("N/A");
@@ -201,7 +215,7 @@ export default function EditorPage() {
   
     setIsTranscribing(true);
     setErrorState({ isError: false });
-    setTranscriptionHtml(null); 
+    setTranscriptionData(null); 
     toast({
       title: "Transcription Initiated",
       description: `"${projectDetails.name}" is now being transcribed. This may take a few minutes.`,
@@ -213,10 +227,10 @@ export default function EditorPage() {
     }
   
     try {
-      if (TRANSCRIPTION_FUNCTION_URL.includes(PLACEHOLDER_FUNCTION_URL_SUBSTRING)) {
-        const errorMsg = `Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env.local file, replacing the placeholder: ${PLACEHOLDER_FUNCTION_URL_SUBSTRING}.`;
+      if (TRANSCRIPTION_FUNCTION_URL.includes(PLACEHOLDER_FUNCTION_URL_SUBSTRING) || TRANSCRIPTION_FUNCTION_URL.includes(LEGACY_PLACEHOLDER_FUNCTION_URL_SUBSTRING)) {
+        const errorMsg = `Transcription Function URL is not configured. Please set NEXT_PUBLIC_TRANSCRIPTION_FUNCTION_URL in your .env.local file, replacing the placeholder. Current URL: ${TRANSCRIPTION_FUNCTION_URL}`;
         console.error(errorMsg);
-        throw new Error("Transcription service URL is not configured correctly. Check your .env.local file (created from .env.example) and ensure the placeholder URL is replaced with your actual deployed or emulated Firebase Function URL.");
+        throw new Error("Transcription service URL is not configured correctly. Please check your .env.local file and ensure the URL points to your deployed or emulated Firebase Function.");
       }
   
       const response = await fetch(TRANSCRIPTION_FUNCTION_URL, {
@@ -240,16 +254,29 @@ export default function EditorPage() {
         throw new Error(errorData.message || `Transcription service failed with status: ${response.status}. Check Cloud Function logs for details.`);
       }
       
-      const resultHtml = await response.text();
-      setTranscriptionHtml(resultHtml);
-      setHasUnsavedChanges(true); 
+      const resultJson = await response.json(); // Expect JSON with transcriptionRows and detectedLanguages
       
-      if (project && project.id === projectId) {
-        await mockFirebase.updateProject(projectId, currentUser.uid, { transcript: resultHtml, status: "Completed" as ProjectStatus });
-        setProject(prev => prev ? { ...prev, transcript: resultHtml, status: "Completed" as ProjectStatus } : null);
+      if (resultJson && resultJson.transcriptionRows) {
+        setTranscriptionData(resultJson.transcriptionRows);
+        setHasUnsavedChanges(true); 
+        
+        if (project && project.id === projectId) {
+          await mockFirebase.updateProject(projectId, currentUser.uid, { 
+            transcript: resultJson.transcriptionRows, 
+            detectedLanguages: resultJson.detectedLanguages,
+            status: "Completed" as ProjectStatus 
+          });
+          setProject(prev => prev ? { 
+            ...prev, 
+            transcript: resultJson.transcriptionRows, 
+            detectedLanguages: resultJson.detectedLanguages,
+            status: "Completed" as ProjectStatus 
+          } : null);
+        }
+        toast({ title: "Transcription Complete", description: "Review and save your transcript." });
+      } else {
+        throw new Error("Transcription service returned an unexpected response format.");
       }
-      
-      toast({ title: "Transcription Complete", description: "Review and save your transcript." });
   
     } catch (error: any) {
       console.error("Transcription error:", error);
@@ -269,7 +296,10 @@ export default function EditorPage() {
     } finally {
       setIsTranscribing(false);
       if (searchParams.get('new') === 'true') {
-        router.replace(`/editor/${projectId}`, { shallow: true }); 
+        // Remove 'new=true' from URL query params without full reload
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('new');
+        router.replace(newUrl.pathname + newUrl.search, { shallow: true });
       }
     }
   }, [projectId, currentUser, toast, router, searchParams, project]); 
@@ -290,12 +320,6 @@ export default function EditorPage() {
 
     let audioDataUri;
     try {
-      // For Genkit, we need to pass an accessible URL or a gs:// path.
-      // If file is uploaded client-side and not yet in GCS, data URI is an option for some models/setups,
-      // but it's better to upload to GCS first and pass the gs:// path.
-      // The current Genkit flow expects `audioStoragePath` to be a GCS path or accessible URL.
-      // For this mock flow, we will simulate upload and use a data URI.
-      // IN A REAL APP: Upload to Firebase Storage first, then pass the `gs://<bucket>/<path>`
       audioDataUri = await fileToDataUri(selectedFileForUpload);
     } catch (error) {
       console.error("Error converting file to Data URI:", error);
@@ -304,8 +328,7 @@ export default function EditorPage() {
       return;
     }
     
-    // Mock GCS path. In real app, this path would come from successful Firebase Storage upload.
-    const gsStoragePath = `gs://lexy-s8xiw.firebasestorage.app/audio/${currentUser.uid}/${projectId}/${selectedFileForUpload.name}`;
+    const gsStoragePath = `gs://${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'lexy-s8xiw.firebasestorage.app'}/audio/${currentUser.uid}/${projectId}/${selectedFileForUpload.name}`;
     
     const audio = document.createElement('audio');
     audio.src = URL.createObjectURL(selectedFileForUpload); 
@@ -341,21 +364,17 @@ export default function EditorPage() {
         name: editableProjectName, 
     };
     await mockFirebase.updateProject(projectId, currentUser.uid, projectUpdates);
-    const updatedProjectForDb = { ...project, ...projectUpdates };
+    const updatedProjectForDb = { ...project, ...projectUpdates }; // Ensure all fields are present
     setProject(updatedProjectForDb); 
     
-    // Simulate getting a playable URL (in real app, this would be a signed URL or public GCS URL)
-    const { playerSrc } = await mockFirebase.getAudioUrl(gsStoragePath);
+    const { playerSrc } = await mockFirebase.getAudioUrl(gsStoragePath); // Simulate getting a playable URL
     setMediaPlayerSrc(playerSrc);
 
-    // IMPORTANT: Pass the `audioDataUri` if your function expects that for direct processing,
-    // OR pass `gsStoragePath` if your function will fetch from GCS.
     // The Genkit flow `transcribe-audio-flow.ts` expects `audioStoragePath` as a URL or `gs://` path.
-    // For the mock `fileToDataUri` used here, we are passing the data URI.
-    // Change to `gsStoragePath` if your Cloud Function is set up to read from GCS directly.
+    // Using data URI for this example, but for production, upload to GCS first and pass gsStoragePath.
     await callTranscriptionService(
       { name: updatedProjectForDb.name, language: updatedProjectForDb.language },
-      audioDataUri // Or gsStoragePath, depending on function setup
+      audioDataUri // Or gsStoragePath if cloud function reads from GCS
     );
 
     setShowInitialNewProjectUI(false);
@@ -363,23 +382,24 @@ export default function EditorPage() {
 
 
   const handleSave = async () => {
-    if (!project || !currentUser || transcriptionHtml === null) return;
+    if (!project || !currentUser || transcriptionData === null) return;
     setIsSaving(true);
     setErrorState({isError: false});
     try {
-      const newStatus = (project.status === "ErrorTranscription" && transcriptionHtml.length > 0) 
+      const newStatus = (project.status === "ErrorTranscription" && transcriptionData.length > 0) 
                         ? "Completed" 
                         : project.status;
 
       const success = await mockFirebase.updateProject(projectId, currentUser.uid, { 
-          transcript: transcriptionHtml, 
+          transcript: transcriptionData, // Save array of TranscriptionRow
           status: newStatus as ProjectStatus,
-          name: editableProjectName 
+          name: editableProjectName,
+          // detectedLanguages might be saved if needed, currently handled in callTranscriptionService
       });
 
       if (success) {
         setHasUnsavedChanges(false);
-        setProject(prev => prev ? {...prev, status: newStatus as ProjectStatus, transcript: transcriptionHtml, name: editableProjectName} : null); 
+        setProject(prev => prev ? {...prev, status: newStatus as ProjectStatus, transcript: transcriptionData, name: editableProjectName} : null); 
         toast({ title: "Project Saved", description: "Your transcript has been saved." });
       } else {
         throw new Error("Failed to save project to database.");
@@ -427,7 +447,7 @@ export default function EditorPage() {
     );
   }
 
-  if (!project && !isLoadingProject) { // Ensure not to show this while project is loading
+  if (!project && !isLoadingProject) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <AlertTriangle className="h-16 w-16 text-destructive mx-auto mb-4" />
@@ -438,14 +458,13 @@ export default function EditorPage() {
     );
   }
   
-  // Ensure project is not null before trying to access its properties
-  if (!project) return null; // Or a more specific loading/error state if it reaches here unexpectedly
+  if (!project) return null;
 
   const showManualTranscribeButton = project && 
     (project.status === "Uploaded" || project.status === "ErrorTranscription" || project.status === "Draft") && 
     project.storagePath && !isTranscribing && !showInitialNewProjectUI;
 
-  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || !transcriptionHtml || 
+  const disableSaveButton = isTranscribing || isSaving || !hasUnsavedChanges || !transcriptionData || 
     (project.status !== 'Completed' && project.status !== 'Draft' && project.status !== "ErrorTranscription" && project.status !== "Uploaded");
 
 
@@ -476,9 +495,7 @@ export default function EditorPage() {
               </Button>
               {showManualTranscribeButton && (
                 <Button onClick={() => {
-                  // For re-transcription, we need an accessible URL or gs:// path.
-                  // The Genkit flow expects `audioStoragePath` to be this.
-                  if (project.storagePath) { // Assuming storagePath is gs:// or an accessible https URL
+                  if (project.storagePath) { 
                      callTranscriptionService(
                         { name: editableProjectName, language: project.language },
                         project.storagePath 
@@ -491,7 +508,7 @@ export default function EditorPage() {
                   Transcribe
                 </Button>
               )}
-               {isTranscribing && (
+               {isTranscribing && project.status === 'ProcessingTranscription' && (
                 <Button disabled={true}>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Transcribing...
@@ -516,10 +533,12 @@ export default function EditorPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <MediaPlayer audioSrc={mediaPlayerSrc} isLoading={isLoadingAudio} />
-          <TranscriptionTable transcriptionHtml={transcriptionHtml} isLoading={isTranscribing && transcriptionHtml === null && project.status === 'ProcessingTranscription'} />
+          <TranscriptionTable 
+            data={transcriptionData} 
+            isLoading={isTranscribing && transcriptionData === null && project.status === 'ProcessingTranscription'} 
+          />
         </CardContent>
       </Card>
     </div>
   );
 }
-

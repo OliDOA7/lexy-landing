@@ -25,13 +25,14 @@ export interface UserProfile {
   // minutesUsed and minutesRemaining will be computed or derived
 }
 
-export interface TranscriptionSegment {
-  timestamp: string; // Format: [HH:MM:SS]
-  speaker: string;   // e.g., Operator, Speaker A, UM1 (no colon)
+// Updated to TranscriptionRow as per new requirements
+export interface TranscriptionRow {
+  timestamp: string; // Format: "0:05" or "[HH:MM:SS]" - model will be prompted for HH:MM:SS for JSON
+  speaker: string;   // e.g., Operator, Speaker 1
   text: string;      // Transcribed text, potentially with <u> HTML tags
 }
 
-export type ProjectStatus = 
+export type ProjectStatus =
   | "Draft" // Initial state after creation, before audio upload in editor
   | "Uploaded" // File uploaded to storage (via editor), awaiting transcription trigger
   | "PendingTranscription" // User triggered transcription, waiting for function pickup
@@ -49,8 +50,8 @@ export interface Project {
   createdAt: Date; // Using Date object for easier manipulation
   status: ProjectStatus;
   storagePath?: string; // Path to audio file in Firebase Storage, e.g., "gs://bucket/audio/{userId}/{projectId}/filename.mp3"
-  // fileURL is deprecated in favor of dynamically generating from storagePath if needed
-  transcript?: TranscriptionSegment[] | string; // Can be segments array or HTML string
+  transcript?: TranscriptionRow[]; // Updated to store array of TranscriptionRow objects
+  detectedLanguages?: string[]; // Store detected languages
   fileType?: string; // e.g., 'audio/mpeg', 'audio/wav'
   fileSize?: number; // in bytes
   expiresAt?: Date; // Date when the project (especially audio file) expires
@@ -67,5 +68,3 @@ export interface PlanConfig {
   storageDays: number | null;
   // Add other config details if necessary
 }
-
-    
