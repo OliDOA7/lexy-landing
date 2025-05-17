@@ -1,93 +1,63 @@
 
+"use client";
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
 const AppLogo = () => {
-  // Icon dimensions and properties for viewBox
-  const iconWidth = 38;
-  const iconHeight = 38;
-  const iconRadius = iconWidth * 0.25; // Corner radius for the icon
+  // Default to 'dark' as per layout.tsx. This will be updated client-side.
+  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>('dark');
+  const [isClient, setIsClient] = useState(false);
 
-  // Text positioning and sizes for viewBox
-  const textLexyX = iconWidth + 10; // Start Lexy text to the right of icon
-  const textLexySize = 28;
-  const textPoweredBySize = 9;
-  
-  // Overall SVG viewBox dimensions
-  const svgViewBoxWidth = 145; // Defines the coordinate system for the drawing
-  const svgViewBoxHeight = 50;  // Defines the coordinate system for the drawing
+  useEffect(() => {
+    setIsClient(true);
+    // Check the actual theme class on the html element
+    const currentIsDark = document.documentElement.classList.contains('dark');
+    setEffectiveTheme(currentIsDark ? 'dark' : 'light');
 
-  // Calculate vertical alignment to center the "Lexy" text and icon body within the viewBox
-  const lexyTextYBaseline = svgViewBoxHeight / 2 + textLexySize / 3; // Approximate optical center
-  const iconYOffset = lexyTextYBaseline - iconHeight / 2 - 2; // Align icon center with Lexy's optical center, adjust for baseline
-  const poweredByTextY = lexyTextYBaseline + textLexySize / 2 + textPoweredBySize / 2 - 2;
+    // Optional: If you have a theme switcher that modifies the class,
+    // you might want to observe changes to documentElement's class attribute.
+    // For now, this runs once on mount.
+  }, []);
 
+  // Dimensions based on the previous SVG's viewBox to maintain aspect ratio
+  const logoWidth = 145;
+  const logoHeight = 50;
 
   return (
     <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
-      <svg
-        width={250} 
-        height={250}
-        viewBox={`0 0 ${svgViewBoxWidth} ${svgViewBoxHeight}`} // Internal coordinate system
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-label="Lexy powered by HOW2 Studio"
-        preserveAspectRatio="xMidYMid meet" // Ensures aspect ratio is maintained and logo fits
-      >
-        {/* Icon Group */}
-        <g transform={`translate(0, ${iconYOffset})`}>
-          <defs>
-            <clipPath id="lexyIconClip">
-              {/* Approximated path for the speech bubble/pin icon shape */}
-              <path d={`M${iconRadius} 0 
-                         H${iconWidth - iconRadius} 
-                         A${iconRadius} ${iconRadius} 0 0 1 ${iconWidth} ${iconRadius} 
-                         V${iconHeight - iconRadius} 
-                         A${iconRadius} ${iconRadius} 0 0 1 ${iconWidth - iconRadius} ${iconHeight} 
-                         H${iconWidth * 0.45} 
-                         L${iconWidth * 0.2} ${iconHeight + iconHeight * 0.15} 
-                         L${iconWidth * 0.3} ${iconHeight} 
-                         H${iconRadius} 
-                         A${iconRadius} ${iconRadius} 0 0 1 0 ${iconHeight - iconRadius} 
-                         V${iconRadius} 
-                         A${iconRadius} ${iconRadius} 0 0 1 ${iconRadius} 0 Z`} />
-            </clipPath>
-          </defs>
-          
-          {/* Apply clipping to the group of colored parts for the sharp diagonal effect */}
-          <g clipPath="url(#lexyIconClip)">
-            {/* Purple part (covers top-left half of the bounding box) */}
-            <path d={`M0,0 L${iconWidth},0 L0,${iconHeight} Z`} fill="hsl(var(--primary))" />
-            {/* Orange part (covers bottom-right half of the bounding box) */}
-            <path d={`M${iconWidth},0 L${iconWidth},${iconHeight} L0,${iconHeight} Z`} fill="hsl(var(--secondary))" />
-          </g>
-        </g>
-
-        {/* Text "Lexy" */}
-        <text
-          x={textLexyX}
-          y={lexyTextYBaseline} 
-          fontFamily="var(--font-sans, Arial, Helvetica, sans-serif)"
-          fontSize={textLexySize}
-          fontWeight="bold"
-          fill="hsl(var(--primary-foreground))"
-        >
-          Lexy
-        </text>
-
-        {/* Text "powered by HOW2 STUDIO" */}
-        <text
-          x={textLexyX + 32} // Moved 32 pixels to the right
-          y={poweredByTextY} 
-          fontFamily="var(--font-sans, Arial, Helvetica, sans-serif)"
-          fontSize={textPoweredBySize}
-          fill="hsl(var(--primary-foreground))"
-        >
-          powered by <tspan fontWeight="bold" fill="hsl(var(--secondary))">HOW2</tspan> <tspan fontWeight="bold" fill="hsl(var(--accent))">STUDIO</tspan>
-        </text>
-      </svg>
+      {isClient ? ( // Only render theme-specific logo on client after check
+        effectiveTheme === 'dark' ? (
+          <Image
+            src="/assets/images/lexy-logo-white.png"
+            alt="Lexy AI Transcription - Powered by How2 Studio (Dark Mode)"
+            width={logoWidth}
+            height={logoHeight}
+            priority 
+          />
+        ) : (
+          <Image
+            src="/assets/images/lexy-logo-black.png"
+            alt="Lexy AI Transcription - Powered by How2 Studio (Light Mode)"
+            width={logoWidth}
+            height={logoHeight}
+            priority
+          />
+        )
+      ) : (
+        // Fallback for SSR: Render the dark mode logo by default to match server-rendered HTML class.
+        // This helps prevent hydration mismatches.
+        <Image
+            src="/assets/images/lexy-logo-white.png"
+            alt="Lexy AI Transcription - Powered by How2 Studio"
+            width={logoWidth}
+            height={logoHeight}
+            priority
+        />
+      )}
     </Link>
   );
 };
 
 export default AppLogo;
-    
