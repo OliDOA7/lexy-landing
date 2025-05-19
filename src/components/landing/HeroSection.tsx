@@ -9,7 +9,7 @@ const HeroSection = () => {
       <div className="relative z-20 container mx-auto px-4 grid md:grid-cols-1 gap-12 items-center">
         <div className="text-center md:text-left">
           <div className="mb-8 flex justify-center md:justify-start">
-            <StaticLogoImage width={145} height={50} />
+            <StaticLogoImage width={435} height={150} />
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
             Unlock Insights with AI Transcription
