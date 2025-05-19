@@ -25,10 +25,10 @@ const AudienceSection = () => {
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Built for Professionals Who Handle BOP Audio
           </h2>
-          <p className="text-lg text-muted-foreground mb-12 max-w-3xl mx-auto">
-            <StaticLogoImage width={58} height={20} className="inline-block align-middle mr-1 relative -top-px" /> {/* Approx 145*0.4 / 50*0.4 */}
+          <div className="text-lg text-muted-foreground mb-12 max-w-3xl mx-auto"> {/* Changed p to div here */}
+            <StaticLogoImage width={58} height={20} className="inline-block align-middle mr-1 relative -top-px" />
             is purpose-built for the people responsible for transcribing and translating sensitive inmate communications. Whether you’re working solo or managing a team, Lexy gives you the speed, security, and language flexibility you need to get the job done.
-          </p>
+          </div>
         </div>
         <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-8">
           {audienceData.map((audience, index) => (
