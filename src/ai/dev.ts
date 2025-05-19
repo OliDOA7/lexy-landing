@@ -1,2 +1,3 @@
-// Flows will be imported for their side effects in this file.
-import './flows/transcribe-audio-flow';
+
+// This file is intentionally left empty as AI flows are not used in the landing page.
+// Flows related to transcription have been removed.

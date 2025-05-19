@@ -13,16 +13,16 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'picsum.photos',
+        hostname: 'picsum.photos', // Kept for potential placeholder images
         port: '',
         pathname: '/**',
       },
-       {
+      {
         protocol: 'https',
-        hostname: 'storage.googleapis.com', // For Firebase Storage via GCS
+        hostname: 'placehold.co', // Kept for placeholder images
         port: '',
         pathname: '/**',
-      },
+      }
     ],
   },
   // Environment variables that should be available on the client side

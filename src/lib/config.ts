@@ -1,45 +1,9 @@
-import type { PlanConfig, Plan } from "./types";
 
-export const PLANS_CONFIG: Record<string, PlanConfig> = {
-  free: {
-    id: "free",
-    name: "Free",
-    priceNumerical: 0,
-    minuteLimitDaily: 3,
-    minuteLimitMonthly: null, // Or a small monthly cap if daily aggregates monthly
-    projectLimit: 1,
-    storageDays: 0, // Not saved in cloud
-  },
-  starter: {
-    id: "starter",
-    name: "Starter",
-    priceNumerical: 19.99,
-    minuteLimitDaily: 45,
-    minuteLimitMonthly: null, // Or a monthly cap if daily aggregates monthly
-    projectLimit: 5,
-    storageDays: 5,
-  },
-  plus: {
-    id: "plus",
-    name: "Plus",
-    priceNumerical: 69.99,
-    minuteLimitDaily: null, // Uses monthly limit
-    minuteLimitMonthly: 1500,
-    projectLimit: 30,
-    storageDays: 15,
-  },
-  pro: {
-    id: "pro",
-    name: "Pro",
-    priceNumerical: 199,
-    minuteLimitDaily: null, // Uses monthly limit
-    minuteLimitMonthly: 5000,
-    projectLimit: 100,
-    storageDays: 90, // 3 months
-  },
-};
+import type { Plan } from "./types";
 
-// This is the data used for the landing page and plan selection page cards
+// PLANS_CONFIG was removed as it was primarily used by the dashboard and backend logic.
+// DISPLAY_PLANS is kept as it's used by the landing page pricing section.
+
 export const DISPLAY_PLANS: Plan[] = [
   {
     id: "free",
@@ -55,9 +19,7 @@ export const DISPLAY_PLANS: Plan[] = [
     ],
     cta: "Start with Free",
     themeColor: "hsl(var(--muted-foreground))",
-    minuteLimitDaily: PLANS_CONFIG.free.minuteLimitDaily,
-    projectLimit: PLANS_CONFIG.free.projectLimit,
-    storageDays: PLANS_CONFIG.free.storageDays,
+    // Removed detailed plan limits not relevant for landing page display logic
   },
   {
     id: "starter",
@@ -73,9 +35,6 @@ export const DISPLAY_PLANS: Plan[] = [
     ],
     cta: "Choose Starter",
     themeColor: "hsl(var(--accent))",
-    minuteLimitDaily: PLANS_CONFIG.starter.minuteLimitDaily,
-    projectLimit: PLANS_CONFIG.starter.projectLimit,
-    storageDays: PLANS_CONFIG.starter.storageDays,
   },
   {
     id: "plus",
@@ -93,10 +52,6 @@ export const DISPLAY_PLANS: Plan[] = [
     ],
     cta: "Choose Plus",
     isPopular: true,
-    minuteLimitMonthly: PLANS_CONFIG.plus.minuteLimitMonthly,
-    projectLimit: PLANS_CONFIG.plus.projectLimit,
-    storageDays: PLANS_CONFIG.plus.storageDays,
-
   },
   {
     id: "pro",
@@ -116,8 +71,5 @@ export const DISPLAY_PLANS: Plan[] = [
     ],
     cta: "Choose Pro",
     themeColor: "hsl(var(--secondary))",
-    minuteLimitMonthly: PLANS_CONFIG.pro.minuteLimitMonthly,
-    projectLimit: PLANS_CONFIG.pro.projectLimit,
-    storageDays: PLANS_CONFIG.pro.storageDays,
   },
 ];
