@@ -1,15 +1,16 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-// AppLogo import is removed as it's not used in the title anymore
+import StaticLogoImage from "../layout/StaticLogoImage";
 
 const HeroSection = () => {
   return (
     <section className="relative py-20 md:py-32 overflow-hidden bg-background/70">
-      {/* Video background and its overlay are removed from here as it's now handled by VideoSplashScreen */}
-      
       <div className="relative z-20 container mx-auto px-4 grid md:grid-cols-1 gap-12 items-center">
         <div className="text-center md:text-left">
+          <div className="mb-8 flex justify-center md:justify-start">
+            <StaticLogoImage width={145} height={50} />
+          </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
             Unlock Insights with AI Transcription
           </h1>
