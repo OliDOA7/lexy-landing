@@ -1,5 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import StaticLogoImage from "../layout/StaticLogoImage";
 
 const audienceData = [
   {
@@ -25,7 +26,8 @@ const AudienceSection = () => {
             Built for Professionals Who Handle BOP Audio
           </h2>
           <p className="text-lg text-muted-foreground mb-12 max-w-3xl mx-auto">
-            Lexy is purpose-built for the people responsible for transcribing and translating sensitive inmate communications. Whether you’re working solo or managing a team, Lexy gives you the speed, security, and language flexibility you need to get the job done.
+            <StaticLogoImage width={58} height={20} className="inline-block align-middle mr-1 relative -top-px" /> {/* Approx 145*0.4 / 50*0.4 */}
+            is purpose-built for the people responsible for transcribing and translating sensitive inmate communications. Whether you’re working solo or managing a team, Lexy gives you the speed, security, and language flexibility you need to get the job done.
           </p>
         </div>
         <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-8">

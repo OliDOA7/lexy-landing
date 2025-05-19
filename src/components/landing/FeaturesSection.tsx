@@ -1,5 +1,7 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Zap, ShieldCheck, Users, Clock, FileText, Bot } from "lucide-react";
+import StaticLogoImage from "../layout/StaticLogoImage";
 
 const features = [
   {
@@ -39,7 +41,11 @@ const FeaturesSection = () => {
     <section id="features" className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">Why Choose Lexy?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold flex items-center justify-center flex-wrap gap-2">
+            Why Choose 
+            <StaticLogoImage width={109} height={38} className="mx-1" /> {/* Approx 145*0.75 / 50*0.75 */}
+            ?
+          </h2>
           <p className="text-lg text-muted-foreground mt-2">
             Powerful features designed to make your transcription process seamless and efficient.
           </p>
