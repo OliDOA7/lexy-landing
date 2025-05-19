@@ -1,15 +1,33 @@
 
+"use client";
+
 import type { Plan } from "@/lib/types";
 import { DISPLAY_PLANS } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Only show a subset of plans on the landing page for brevity
 const landingPagePlans: Plan[] = DISPLAY_PLANS.slice(0, 4); // Show all 4 defined for landing
 
 const PricingSectionLanding = () => {
+  const { toast } = useToast(); // Initialize useToast
+
+  const handleProceedToCheckout = (planName: string, planId: string) => {
+    console.log(`Proceeding to checkout for ${planName} (ID: ${planId}). Stripe integration would start here.`);
+    toast({
+      title: "Proceeding to Checkout",
+      description: `You've selected the ${planName} plan. Integrating Stripe payment flow here.`,
+    });
+    // In a real application, you would:
+    // 1. Ensure the user is authenticated.
+    // 2. Call a backend function to create a Stripe Checkout session for the selected planId.
+    // 3. Redirect the user to the Stripe Checkout page.
+    // router.push(`/checkout?plan=${planId}`); // Example redirect
+  };
+
   return (
     <section id="pricing" className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
@@ -45,8 +63,12 @@ const PricingSectionLanding = () => {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button className="w-full" variant={plan.isPopular ? "default" : "outline"} asChild>
-                  <Link href="/signup">{plan.cta === "Get Started" ? plan.cta : "Choose Plan"}</Link>
+                <Button 
+                  className="w-full" 
+                  variant={plan.isPopular ? "default" : "outline"} 
+                  onClick={() => handleProceedToCheckout(plan.name, plan.id)}
+                >
+                  {plan.cta === "Start with Free" ? "Get Started" : "Proceed to Checkout"}
                 </Button>
               </CardFooter>
             </Card>
