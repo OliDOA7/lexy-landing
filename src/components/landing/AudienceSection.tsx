@@ -26,7 +26,7 @@ const AudienceSection = () => {
             Built for Professionals Who Handle BOP Audio
           </h2>
           <div className="text-lg text-muted-foreground mb-12 max-w-3xl mx-auto"> {/* Changed p to div here */}
-            <StaticLogoImage width={58} height={20} className="inline-block align-middle mr-1 relative -top-px" />
+            <StaticLogoImage width={145} height={50} className="inline-block align-middle mr-1 relative -top-px" />
             is purpose-built for the people responsible for transcribing and translating sensitive inmate communications. Whether you’re working solo or managing a team, Lexy gives you the speed, security, and language flexibility you need to get the job done.
           </div>
         </div>
