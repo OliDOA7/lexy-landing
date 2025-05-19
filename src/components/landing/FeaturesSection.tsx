@@ -43,7 +43,7 @@ const FeaturesSection = () => {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold flex items-center justify-center flex-wrap gap-2">
             Why Choose 
-            <StaticLogoImage width={109} height={38} className="mx-1" /> {/* Approx 145*0.75 / 50*0.75 */}
+            <StaticLogoImage width={164} height={57} className="mx-1" /> {/* Approx 145*0.75 / 50*0.75 */}
             ?
           </h2>
           <p className="text-lg text-muted-foreground mt-2">
