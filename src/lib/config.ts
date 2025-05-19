@@ -28,7 +28,7 @@ export const DISPLAY_PLANS: Plan[] = [
     priceFrequency: "/mo",
     features: [
       "Up to 5 projects",
-      "20 minutes of transcription per day", // Updated from 45 minutes
+      "600 minutes of transcription per month", // Changed from "20 minutes of transcription per day"
       "Projects saved for up to 5 days from creation date",
       "Standard Accuracy",
       "Email support",
