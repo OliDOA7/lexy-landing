@@ -8,8 +8,8 @@ const ComparisonSection = () => {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            <h2 className="text-3xl md:text-4xl font-bold inline-flex items-baseline">
-              <span className="mr-2 inline-block" style={{ transform: 'scale(0.45) translateY(0.1em)'}}> 
+            <h2 className="text-3xl md:text-4xl font-bold inline-flex items-center"> {/* Changed items-baseline to items-center */}
+              <span className="mr-2 inline-block" style={{ transform: 'scale(0.45) translateY(0.1em)'}}>
                 <AppLogo />
               </span>
                vs. The Rest
