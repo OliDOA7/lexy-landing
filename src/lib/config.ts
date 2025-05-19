@@ -28,7 +28,7 @@ export const DISPLAY_PLANS: Plan[] = [
     priceFrequency: "/mo",
     features: [
       "Up to 5 projects",
-      "600 minutes of transcription per month", // Changed from "20 minutes of transcription per day"
+      "600 minutes of transcription per month",
       "Projects saved for up to 5 days from creation date",
       "Standard Accuracy",
       "Email support",
@@ -43,7 +43,7 @@ export const DISPLAY_PLANS: Plan[] = [
     priceFrequency: "/mo",
     features: [
       "Up to 30 projects",
-      "1500 minutes of transcription per month",
+      "2000 minutes of transcription per month", // Updated from 1500
       "Projects saved for up to 15 days from creation date",
       "Standard Accuracy",
       "Speaker identification",
@@ -60,7 +60,7 @@ export const DISPLAY_PLANS: Plan[] = [
     priceFrequency: "/mo",
     features: [
       "Up to 100 projects",
-      "5000 minutes of transcription per month",
+      "6000 minutes of transcription per month", // Updated from 5000
       "Projects saved for up to 3 months from creation date",
       "Small teams up to 5 members",
       "Standard Accuracy",
