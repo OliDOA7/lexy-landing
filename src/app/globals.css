@@ -8,33 +8,33 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 3.9%; /* Dark background as requested */
-    --foreground: 0 0% 98%;
+    --background: 220 33% 5%; /* Dark: #080b10 */
+    --foreground: 0 0% 98%; /* Light text for dark background */
 
-    --card: 0 0% 7%; /* Slightly lighter than background for cards */
+    --card: 220 30% 7%; /* Slightly lighter than background */
     --card-foreground: 0 0% 98%;
 
-    --popover: 0 0% 7%;
+    --popover: 220 30% 7%;
     --popover-foreground: 0 0% 98%;
     
-    --primary: 259 86% 51%; /* #5e17eb */
+    --primary: 259 86% 51%; /* Primary: #5e17eb */
     --primary-foreground: 0 0% 100%; /* White */
     
-    --secondary: 14 90% 56%; /* #f35a2b */
+    --secondary: 14 90% 56%; /* Secondary: #f35a2b */
     --secondary-foreground: 0 0% 100%; /* White */
     
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted: 220 20% 15%;
+    --muted-foreground: 0 0% 63.9%; /* Existing light gray for text on muted elements */
     
-    --accent: 208 73% 70%; /* #7CB9E8 - Adjusted for dark mode if needed, or keep as is */
-    --accent-foreground: 0 0% 9%; 
+    --accent: 203 100% 68%; /* Tertiary/Accent: #5cbbff */
+    --accent-foreground: 0 0% 9%; /* Dark text for light accent */
     
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84.2% 60.2%; /* Standard red */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 259 80% 65%; /* Lighter primary for rings in dark mode */
+    --border: 220 25% 15%;
+    --input: 220 25% 15%;
+    --ring: 259 80% 65%; /* Lighter primary for focus rings */
 
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -43,46 +43,48 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    --sidebar-background: 228 6% 10%; /* Darker for sidebar */
+    /* Sidebar colors based on the new dark theme */
+    --sidebar-background: 220 33% 5%; /* Same as main background or slightly distinct dark */
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 259 80% 65%;
+    --sidebar-primary: 259 80% 65%; /* Lighter primary for sidebar accents */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 228 6% 15%;
+    --sidebar-accent: 220 30% 10%; /* A subtle accent for sidebar elements */
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 228 6% 20%;
+    --sidebar-border: 220 25% 12%;
     --sidebar-ring: 259 80% 65%;
 
     /* Ensure Inter font is primary */
     --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-
   }
 
-  /* .dark variables are effectively the main theme now */
+  /* .dark variables are the main theme as html tag has class="dark" */
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 220 33% 5%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
+
+    --card: 220 30% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
+
+    --popover: 220 30% 7%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 259 80% 65%; 
+    --primary: 259 86% 51%; 
     --primary-foreground: 0 0% 100%; 
     
-    --secondary: 14 85% 60%; 
+    --secondary: 14 90% 56%; 
     --secondary-foreground: 0 0% 100%;
     
-    --muted: 0 0% 14.9%;
+    --muted: 220 20% 15%;
     --muted-foreground: 0 0% 63.9%;
     
-    --accent: 208 65% 55%; 
-    --accent-foreground: 0 0% 98%;
+    --accent: 203 100% 68%; 
+    --accent-foreground: 0 0% 9%; /* Dark text for light accent */
     
     --destructive: 0 70% 50%; /* Adjusted for better visibility on dark */
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
+    --border: 220 25% 15%;
+    --input: 220 25% 15%;
     --ring: 259 80% 65%;
 
     --chart-1: 220 70% 50%;
@@ -91,13 +93,13 @@ body {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    --sidebar-background: 228 6% 10%;
+    --sidebar-background: 220 33% 5%;
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 259 80% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 228 6% 15%;
+    --sidebar-accent: 220 30% 10%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 228 6% 20%;
+    --sidebar-border: 220 25% 12%;
     --sidebar-ring: 259 80% 65%;
   }
 }
