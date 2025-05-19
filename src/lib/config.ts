@@ -28,7 +28,7 @@ export const DISPLAY_PLANS: Plan[] = [
     priceFrequency: "/mo",
     features: [
       "Up to 5 projects",
-      "45 minutes of transcription per day",
+      "20 minutes of transcription per day", // Updated from 45 minutes
       "Projects saved for up to 5 days from creation date",
       "Standard Accuracy",
       "Email support",
@@ -73,3 +73,4 @@ export const DISPLAY_PLANS: Plan[] = [
     themeColor: "hsl(var(--secondary))",
   },
 ];
+
